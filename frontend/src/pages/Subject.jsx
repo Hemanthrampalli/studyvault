@@ -1,115 +1,177 @@
+// Subject.jsx
+// Shows all materials for a specific subject
+// Allows filtering by type and searching by name
+// Logged in users can upload new materials
+
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { getMaterials, getSubjects } from '../api'
-import Material from '../components/Material'
-import UploadModal from '../components/UploaModal'
 import { useAuth } from '../context/AuthContext'
+import MaterialCard from '../components/MaterialCard'
+import UploadModal from '../components/UploadModal'
+
+const TYPE_FILTERS = [
+  { value: 'all',       label: 'All'        },
+  { value: 'notes',     label: '📝 Notes'   },
+  { value: 'pyq',       label: '📋 PYQs'    },
+  { value: 'lab',       label: '🧪 Lab'     },
+  { value: 'slides',    label: '🖥️ Slides'  },
+  { value: 'reference', label: '📚 Reference'},
+]
 
 export default function Subject() {
+  // useParams reads the :subject_id from the URL
   const { subject_id } = useParams()
-  const { user } = useAuth()
-  const [subject, setSubject] = useState(null)
-  const [materials, setMaterials] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [uploadOpen, setUploadOpen] = useState(false)
+  const navigate        = useNavigate()
+  const { user }        = useAuth()
 
-  // Fetch subject name and materials
+  const [materials,    setMaterials   ] = useState([])
+  const [subject,      setSubject     ] = useState(null)
+  const [loading,      setLoading     ] = useState(true)
+  const [filter,       setFilter      ] = useState('all')
+  const [search,       setSearch      ] = useState('')
+  const [showUpload,   setShowUpload  ] = useState(false)
+
+  // Load subject info and materials on page load
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-
-        // Get subject name (all subjects, then filter)
-        const subjectsRes = await getSubjects({})
-        const found = subjectsRes.data.find(s => s.id === subject_id)
-        setSubject(found)
-
-        // Get materials for this subject
-        const materialsRes = await getMaterials(subject_id)
-        setMaterials(materialsRes.data)
-      } catch (err) {
-        console.error('Error fetching:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
+    Promise.all([
+      getMaterials(subject_id),
+    ]).then(([matsRes]) => {
+      setMaterials(matsRes.data)
+    }).finally(() => setLoading(false))
   }, [subject_id])
 
-  // Refresh materials after upload
-  const handleUploadSuccess = async () => {
-    try {
-      const res = await getMaterials(subject_id)
-      setMaterials(res.data)
-    } catch (err) {
-      console.error('Error refreshing materials:', err)
-    }
+  // Called when a new material is uploaded successfully
+  // Adds it to the top of the list without reloading
+  const handleUploadSuccess = (newMaterial) => {
+    setMaterials(prev => [newMaterial, ...prev])
   }
+
+  // Update download count in UI when user downloads
+  const handleDownload = (materialId) => {
+    setMaterials(prev =>
+      prev.map(m =>
+        m.id === materialId
+          ? { ...m, downloads: m.downloads + 1 }
+          : m
+      )
+    )
+  }
+
+  // Apply filter and search
+  const filtered = materials
+    .filter(m => filter === 'all' || m.material_type === filter)
+    .filter(m => m.title.toLowerCase().includes(search.toLowerCase()))
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <p className="text-gray-400">Loading...</p>
+        <p className="text-gray-400">Loading materials...</p>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <div className="max-w-6xl mx-auto px-4 py-12">
+      <div className="max-w-6xl mx-auto px-4 py-10">
+
+        {/* Back button */}
+        <button
+          onClick={() => navigate('/browse')}
+          className="text-gray-500 hover:text-white text-sm mb-6 flex items-center gap-2 transition-colors"
+        >
+          ← Back to Browse
+        </button>
 
         {/* Header */}
-        <div className="flex justify-between items-start mb-8">
+        <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
           <div>
-            <h1 className="text-4xl font-bold mb-2">{subject?.name || 'Subject'}</h1>
-            <p className="text-gray-400">
+            <h1 className="text-3xl font-black mb-1">
+              {subject?.name || 'Subject Materials'}
+            </h1>
+            <p className="text-gray-400 text-sm">
               {materials.length} materials available
             </p>
           </div>
 
-          {/* Upload Button - Only for logged in users */}
-          {user && (
+          {/* Upload button — only for logged in users */}
+          {user ? (
             <button
-              onClick={() => setUploadOpen(true)}
-              className="bg-teal-600 hover:bg-teal-700 text-white font-bold px-6 py-3 rounded-lg transition"
+              onClick={() => setShowUpload(true)}
+              className="bg-teal-500 hover:bg-teal-600 text-white font-bold px-6 py-3 rounded-xl transition-colors text-sm"
             >
-              📤 Upload Material
+              ⬆ Upload Material
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/login')}
+              className="border border-gray-700 hover:border-gray-500 text-gray-400 font-medium px-6 py-3 rounded-xl transition-colors text-sm"
+            >
+              Login to Upload
             </button>
           )}
         </div>
 
-        {/* Materials Grid */}
-        {materials.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {materials.map(material => (
-              <Material key={material.id} material={material} />
+        {/* Search and Filter bar */}
+        <div className="flex flex-wrap gap-3 mb-8">
+          {/* Search input */}
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search materials..."
+            className="flex-1 min-w-48 bg-gray-900 border border-gray-800 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-500 transition-colors"
+          />
+
+          {/* Type filter buttons */}
+          <div className="flex flex-wrap gap-2">
+            {TYPE_FILTERS.map(f => (
+              <button
+                key={f.value}
+                onClick={() => setFilter(f.value)}
+                className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  filter === f.value
+                    ? 'bg-teal-500 text-white'
+                    : 'bg-gray-900 border border-gray-800 text-gray-400 hover:border-gray-600'
+                }`}
+              >
+                {f.label}
+              </button>
             ))}
           </div>
-        ) : (
-          <div className="text-center py-12 bg-gray-900 rounded-lg border border-gray-800">
-            <p className="text-gray-400 text-lg">
-              No materials uploaded yet for this subject.
+        </div>
+
+        {/* Materials Grid */}
+        {filtered.length === 0 ? (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-16 text-center">
+            <div className="text-5xl mb-4">📭</div>
+            <p className="text-gray-400 font-medium">No materials found</p>
+            <p className="text-gray-600 text-sm mt-1">
+              {user ? 'Be the first to upload!' : 'Login to upload materials'}
             </p>
-            {user && (
-              <button
-                onClick={() => setUploadOpen(true)}
-                className="mt-4 text-teal-400 hover:text-teal-300 font-bold"
-              >
-                Be the first to upload →
-              </button>
-            )}
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map(material => (
+              <MaterialCard
+                key={material.id}
+                material={material}
+                onDownload={handleDownload}
+              />
+            ))}
           </div>
         )}
+
       </div>
 
       {/* Upload Modal */}
-      <UploadModal
-        isOpen={uploadOpen}
-        onClose={() => setUploadOpen(false)}
-        subject_id={subject_id}
-        onSuccess={handleUploadSuccess}
-      />
+      {showUpload && (
+        <UploadModal
+          subjectId={subject_id}
+          onClose={() => setShowUpload(false)}
+          onSuccess={handleUploadSuccess}
+        />
+      )}
     </div>
   )
 }

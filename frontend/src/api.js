@@ -55,6 +55,7 @@ export const uploadMaterial = (formData) =>
     headers: { 'Content-Type': 'multipart/form-data' }
   })
 
+// Ensure this is named 'downloadMaterial'
 export const downloadMaterial = (material_id) =>
   API.patch(`/api/materials/${material_id}/download`)
 

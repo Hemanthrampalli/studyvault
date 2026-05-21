@@ -1,285 +1,211 @@
+// Browse.jsx
+// Main navigation page
+// User selects: Department → Year → Semester → Subject
+// Each selection filters the next level
+
 import { useState, useEffect } from 'react'
-import { getDepartments, getSubjects, getMaterials } from '../api'
-import Material from '../components/Material'
-import UploadModal from '../components/UploaModal'
-import { useAuth } from '../context/AuthContext'
+import { useNavigate } from 'react-router-dom'
+import { getDepartments, getSubjects } from '../api'
+
+// Year and semester options
+const YEARS = [
+  { value: 1, label: '1st Year', icon: '🌱' },
+  { value: 2, label: '2nd Year', icon: '📗' },
+  { value: 3, label: '3rd Year', icon: '🔬' },
+  { value: 4, label: '4th Year', icon: '🎓' },
+]
+
+const SEMESTERS = {
+  1: [1, 2],
+  2: [3, 4],
+  3: [5, 6],
+  4: [7, 8],
+}
 
 export default function Browse() {
-  const { user } = useAuth()
-  
-  // Filter states
+  const navigate = useNavigate()
+
+  // Selection state — tracks what user has picked
+  const [selectedDept, setSelectedDept] = useState(null)
+  const [selectedYear, setSelectedYear] = useState(null)
+  const [selectedSem,  setSelectedSem ] = useState(null)
+
+  // Data from backend
   const [departments, setDepartments] = useState([])
-  const [selectedDept, setSelectedDept] = useState('')
+  const [subjects,    setSubjects    ] = useState([])
 
-  const [years, setYears] = useState([])
-  const [selectedYear, setSelectedYear] = useState('')
+  // Loading states
+  const [loadingDepts,    setLoadingDepts   ] = useState(true)
+  const [loadingSubjects, setLoadingSubjects] = useState(false)
 
-  const [semesters, setSemesters] = useState([])
-  const [selectedSemester, setSelectedSemester] = useState('')
-
-  const [subjects, setSubjects] = useState([])
-  const [selectedSubject, setSelectedSubject] = useState(null)
-
-  const [materials, setMaterials] = useState([])
-  const [uploadOpen, setUploadOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
-
-  // Load departments on mount
+  // Load departments once on page load
   useEffect(() => {
-    const loadDepartments = async () => {
-      try {
-        const res = await getDepartments()
-        setDepartments(res.data)
-      } catch (err) {
-        console.error('Error loading departments:', err)
-      }
-    }
-    loadDepartments()
+    getDepartments()
+      .then(res => setDepartments(res.data))
+      .finally(() => setLoadingDepts(false))
   }, [])
 
-  // When department changes, load subjects for that dept + extract years
+  // Load subjects whenever dept + year + semester are all selected
   useEffect(() => {
-    if (!selectedDept) {
-      setYears([])
-      setSelectedYear('')
-      setSemesters([])
-      setSelectedSemester('')
-      setSubjects([])
-      setSelectedSubject(null)
-      setMaterials([])
-      return
-    }
+    if (!selectedDept || !selectedYear || !selectedSem) return
 
-    const loadSubjects = async () => {
-      try {
-        setLoading(true)
-        const res = await getSubjects({ department_id: selectedDept })
-        setSubjects(res.data)
+    setLoadingSubjects(true)
+    getSubjects({
+      department_id: selectedDept.id,
+      year:          selectedYear,
+      semester:      selectedSem
+    })
+      .then(res => setSubjects(res.data))
+      .finally(() => setLoadingSubjects(false))
 
-        // Extract unique years
-        const uniqueYears = [...new Set(res.data.map(s => s.year))].sort()
-        setYears(uniqueYears)
-        setSelectedYear('')
-        setSemesters([])
-        setSelectedSemester('')
-      } catch (err) {
-        console.error('Error loading subjects:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
+  }, [selectedDept, selectedYear, selectedSem])
 
-    loadSubjects()
-  }, [selectedDept])
-
-  // When year changes, extract semesters
-  useEffect(() => {
-    if (!selectedYear) {
-      setSemesters([])
-      setSelectedSemester('')
-      setSelectedSubject(null)
-      setMaterials([])
-      return
-    }
-
-    const filtered = subjects.filter(s => s.year === parseInt(selectedYear))
-    const uniqueSemesters = [...new Set(filtered.map(s => s.semester))].sort()
-    setSemesters(uniqueSemesters)
-    setSelectedSemester('')
-  }, [selectedYear, subjects])
-
-  // When semester changes, filter subjects
-  useEffect(() => {
-    if (!selectedSemester) {
-      setSelectedSubject(null)
-      setMaterials([])
-      return
-    }
-
-    const filtered = subjects.filter(
-      s => s.year === parseInt(selectedYear) && s.semester === parseInt(selectedSemester)
-    )
-    // Automatically load materials if only 1 subject
-    if (filtered.length === 1) {
-      setSelectedSubject(filtered[0])
-      loadMaterials(filtered[0].id)
-    }
-  }, [selectedSemester])
-
-  // When subject changes, load its materials
-  const handleSubjectClick = (subject) => {
-    setSelectedSubject(subject)
-    loadMaterials(subject.id)
+  // When department changes, reset everything below it
+  const handleDeptSelect = (dept) => {
+    setSelectedDept(dept)
+    setSelectedYear(null)
+    setSelectedSem(null)
+    setSubjects([])
   }
 
-  const loadMaterials = async (subject_id) => {
-    try {
-      setLoading(true)
-      const res = await getMaterials(subject_id)
-      setMaterials(res.data)
-    } catch (err) {
-      console.error('Error loading materials:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleUploadSuccess = () => {
-    if (selectedSubject) {
-      loadMaterials(selectedSubject.id)
-    }
+  // When year changes, reset semester and subjects
+  const handleYearSelect = (year) => {
+    setSelectedYear(year)
+    setSelectedSem(null)
+    setSubjects([])
   }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <div className="max-w-6xl mx-auto px-4 py-12">
+      <div className="max-w-6xl mx-auto px-4 py-10">
 
-        <h1 className="text-4xl font-bold mb-2">Browse Materials</h1>
-        <p className="text-gray-400 mb-8">
-          Find study materials by department, year, semester and subject
+        <h1 className="text-3xl font-black mb-2">Browse Materials</h1>
+        <p className="text-gray-400 mb-10">
+          Select your department, year and semester to find study materials
         </p>
 
-        {/* Filters Row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        {/* ── STEP 1: Department ────────────────────────── */}
+        <section className="mb-10">
+          <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
+            Step 1 — Select Department
+          </h2>
 
-          {/* Department */}
-          <div>
-            <label className="block text-sm font-bold text-gray-300 mb-2">
-              Department
-            </label>
-            <select
-              value={selectedDept}
-              onChange={(e) => setSelectedDept(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:border-teal-500"
-            >
-              <option value="">Select Department</option>
+          {loadingDepts ? (
+            <p className="text-gray-500">Loading departments...</p>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {departments.map(dept => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
+                <button
+                  key={dept.id}
+                  onClick={() => handleDeptSelect(dept)}
+                  className={`p-4 rounded-xl border text-left transition-all ${
+                    selectedDept?.id === dept.id
+                      ? 'bg-teal-500/20 border-teal-500 text-teal-300'
+                      : 'bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-600'
+                  }`}
+                >
+                  <div className="font-bold text-sm">{dept.code}</div>
+                  <div className="text-xs text-gray-500 mt-1 leading-snug">{dept.name}</div>
+                </button>
               ))}
-            </select>
-          </div>
-
-          {/* Year */}
-          <div>
-            <label className="block text-sm font-bold text-gray-300 mb-2">
-              Year
-            </label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              disabled={!selectedDept}
-              className="w-full bg-gray-800 border border-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:border-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="">Select Year</option>
-              {years.map(year => (
-                <option key={year} value={year}>
-                  Year {year}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Semester */}
-          <div>
-            <label className="block text-sm font-bold text-gray-300 mb-2">
-              Semester
-            </label>
-            <select
-              value={selectedSemester}
-              onChange={(e) => setSelectedSemester(e.target.value)}
-              disabled={!selectedYear}
-              className="w-full bg-gray-800 border border-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:border-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="">Select Semester</option>
-              {semesters.map(sem => (
-                <option key={sem} value={sem}>
-                  Semester {sem}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Upload Button */}
-          {user && selectedSubject && (
-            <div className="flex items-end">
-              <button
-                onClick={() => setUploadOpen(true)}
-                className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold px-4 py-2 rounded transition"
-              >
-                📤 Upload
-              </button>
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Subjects List */}
-        {selectedYear && selectedSemester && (
-          <div className="mb-8">
-            <h2 className="text-xl font-bold mb-4">Subjects</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {subjects
-                .filter(s => s.year === parseInt(selectedYear) && s.semester === parseInt(selectedSemester))
-                .map(subject => (
-                  <button
-                    key={subject.id}
-                    onClick={() => handleSubjectClick(subject)}
-                    className={`p-4 rounded-lg border transition text-left font-bold ${
-                      selectedSubject?.id === subject.id
-                        ? 'bg-teal-600 border-teal-500'
-                        : 'bg-gray-900 border-gray-700 hover:border-teal-500'
-                    }`}
-                  >
-                    {subject.name}
-                  </button>
-                ))}
+        {/* ── STEP 2: Year ──────────────────────────────── */}
+        {selectedDept && (
+          <section className="mb-10">
+            <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
+              Step 2 — Select Year
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {YEARS.map(y => (
+                <button
+                  key={y.value}
+                  onClick={() => handleYearSelect(y.value)}
+                  className={`p-4 rounded-xl border text-left transition-all ${
+                    selectedYear === y.value
+                      ? 'bg-teal-500/20 border-teal-500 text-teal-300'
+                      : 'bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-600'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">{y.icon}</div>
+                  <div className="font-bold text-sm">{y.label}</div>
+                </button>
+              ))}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Materials Grid */}
-        {selectedSubject && (
-          <div>
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="text-2xl font-bold">{selectedSubject.name}</h2>
-                <p className="text-gray-400">
-                  {materials.length} materials available
-                </p>
-              </div>
+        {/* ── STEP 3: Semester ──────────────────────────── */}
+        {selectedYear && (
+          <section className="mb-10">
+            <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
+              Step 3 — Select Semester
+            </h2>
+            <div className="flex gap-3">
+              {SEMESTERS[selectedYear].map(sem => (
+                <button
+                  key={sem}
+                  onClick={() => setSelectedSem(sem)}
+                  className={`px-6 py-3 rounded-xl border font-bold transition-all ${
+                    selectedSem === sem
+                      ? 'bg-teal-500/20 border-teal-500 text-teal-300'
+                      : 'bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-600'
+                  }`}
+                >
+                  Semester {sem}
+                </button>
+              ))}
             </div>
+          </section>
+        )}
 
-            {loading ? (
-              <p className="text-center text-gray-400">Loading materials...</p>
-            ) : materials.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {materials.map(material => (
-                  <Material key={material.id} material={material} />
-                ))}
+        {/* ── STEP 4: Subjects ──────────────────────────── */}
+        {selectedSem && (
+          <section>
+            <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
+              Step 4 — Select Subject
+            </h2>
+
+            {loadingSubjects ? (
+              <p className="text-gray-500">Loading subjects...</p>
+            ) : subjects.length === 0 ? (
+              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center">
+                <div className="text-4xl mb-3">📭</div>
+                <p className="text-gray-400">No subjects found for this selection</p>
               </div>
             ) : (
-              <div className="text-center py-12 bg-gray-900 rounded-lg border border-gray-800">
-                <p className="text-gray-400">No materials uploaded yet</p>
+              <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                {subjects.map((subject, index) => (
+                  <button
+                    key={subject.id}
+                    onClick={() => navigate(`/subject/${subject.id}`)}
+                    className={`w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-800 transition-colors ${
+                      index !== subjects.length - 1 ? 'border-b border-gray-800' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* Subject icon */}
+                      <div className="w-10 h-10 bg-teal-500/10 rounded-xl flex items-center justify-center text-lg">
+                        📘
+                      </div>
+                      <div>
+                        <div className="font-semibold text-white">{subject.name}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {subject.code} · Sem {subject.semester}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-gray-600">→</span>
+                  </button>
+                ))}
               </div>
             )}
-          </div>
+          </section>
         )}
 
-        {!selectedSubject && (
-          <div className="text-center py-12 text-gray-400">
-            Select filters above to browse materials
-          </div>
-        )}
       </div>
-
-      {/* Upload Modal */}
-      <UploadModal
-        isOpen={uploadOpen}
-        onClose={() => setUploadOpen(false)}
-        subject_id={selectedSubject?.id}
-        onSuccess={handleUploadSuccess}
-      />
     </div>
   )
 }
