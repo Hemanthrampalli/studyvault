@@ -50,11 +50,13 @@ export const getSubjects = (filters) =>
 export const getMaterials = (subject_id) =>
   API.get('/api/materials', { params: { subject_id } })
 
-// FormData is used for file uploads (not regular JSON)
 export const uploadMaterial = (formData) =>
   API.post('/api/materials/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
 
-export const trackDownload = (id) =>
-  API.patch(`/api/materials/${id}/download`)
+export const downloadMaterial = (material_id) =>
+  API.patch(`/api/materials/${material_id}/download`)
+
+export const getMyUploads = () =>
+  API.get('/api/materials/my-uploads')
