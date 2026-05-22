@@ -1,31 +1,9 @@
-// Register.jsx
-// New user signup
-// Collects name, email, password, department, year, roll number
-
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { registerUser, getDepartments } from '../api'
 
 export default function Register() {
   const navigate = useNavigate()
-  const [department, setDepartment] = useState("");
-
-  // Add your new options directly into this list!
-  const btechDepartments = [
-    "Computer Science and Engineering (CSE)",
-    "Information Technology (IT)",
-    "Electronics and Communication Engineering (ECE)",
-    "Electrical and Electronics Engineering (EEE)",
-    "Mechanical Engineering (ME)",
-    "Civil Engineering (CE)",
-    "Artificial Intelligence and Data Science (AI&DS)",
-    "Chemical Engineering (ChemE)",
-    "Aerospace Engineering",
-    "Biotechnology (BT)",
-    "Robotics Engineering",              // <--- New option added
-    "Cyber Security and Networks",       // <--- New option added
-    "Data Science (DS)"                  // <--- New option added
-  ];
 
   const [form, setForm] = useState({
     name:          '',
@@ -36,7 +14,6 @@ export default function Register() {
     roll_number:   ''
   })
 
-  // Departments loaded from backend for the dropdown
   const [departments, setDepartments] = useState([])
   const [loading,     setLoading    ] = useState(false)
   const [error,       setError      ] = useState('')
@@ -44,9 +21,17 @@ export default function Register() {
 
   // Load departments when page opens
   useEffect(() => {
+    console.log('Fetching departments...')
+
     getDepartments()
-      .then(res => setDepartments(res.data))
-      .catch(() => setError('Could not load departments'))
+      .then(res => {
+        console.log('Got departments:', res.data)
+        setDepartments(res.data)
+      })
+      .catch(err => {
+        console.log('Error:', err)
+        setError('Could not load departments. Make sure backend is running.')
+      })
   }, [])
 
   const handleChange = (e) => {
@@ -59,22 +44,27 @@ export default function Register() {
     setError('')
     setSuccess('')
 
-    // Basic password length check on frontend
     if (form.password.length < 6) {
       setError('Password must be at least 6 characters')
       setLoading(false)
       return
     }
 
+    if (!form.department_id) {
+      setError('Please select a department')
+      setLoading(false)
+      return
+    }
+
+    console.log('Submitting:', form)
+
     try {
       await registerUser(form)
-      setSuccess('Account created! Please check your email to confirm, then login.')
-
-      // Redirect to login after 3 seconds
-      setTimeout(() => navigate('/login'), 3000)
-
+      setSuccess('Account created! Redirecting to login...')
+      setTimeout(() => navigate('/login'), 2000)
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed. Try again.')
+      console.log('Error:', err.response?.data)
+      setError(err.response?.data?.error || 'Registration failed')
     } finally {
       setLoading(false)
     }
@@ -84,29 +74,30 @@ export default function Register() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
 
-        {/* Header */}
         <div className="text-center mb-8">
           <span className="text-5xl">🎓</span>
           <h1 className="text-white text-3xl font-black mt-4 mb-2">Create account</h1>
           <p className="text-gray-400">Join thousands of BTech students</p>
         </div>
 
-        {/* Card */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8">
 
-          {/* Error */}
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm px-4 py-3 rounded-lg mb-6">
               {error}
             </div>
           )}
 
-          {/* Success */}
           {success && (
             <div className="bg-teal-500/10 border border-teal-500/30 text-teal-400 text-sm px-4 py-3 rounded-lg mb-6">
               {success}
             </div>
           )}
+
+          {/* Show how many departments loaded */}
+          <p className="text-gray-600 text-xs mb-4">
+            {departments.length} departments loaded
+          </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
 
@@ -158,28 +149,35 @@ export default function Register() {
               />
             </div>
 
-            {/* Department dropdown */}
+            {/* Department */}
             <div>
               <label className="text-gray-400 text-sm font-medium block mb-2">
                 Department
               </label>
-              <select
-                name="department_id"
-                value={form.department_id}
-                onChange={handleChange}
-                required
-                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-teal-500 transition-colors"
-              >
-                <option value="">Select your department</option>
-                {btechDepartments.map((dept,index) => (
-                  <option key={index} value={dept}>
-                    {dept}
-                  </option>
-                ))}
-              </select>
+
+              {departments.length === 0 ? (
+                <div className="w-full bg-gray-800 border border-gray-700 text-gray-500 rounded-xl px-4 py-3 text-sm">
+                  Loading departments...
+                </div>
+              ) : (
+                <select
+                  name="department_id"
+                  value={form.department_id}
+                  onChange={handleChange}
+                  required
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-teal-500 transition-colors"
+                >
+                  <option value="">Select your department</option>
+                  {departments.map(dept => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name} ({dept.code})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
-            {/* Year and Roll Number side by side */}
+            {/* Year and Roll Number */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-gray-400 text-sm font-medium block mb-2">
@@ -218,7 +216,7 @@ export default function Register() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || departments.length === 0}
               className="w-full bg-teal-500 hover:bg-teal-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-colors text-sm mt-2"
             >
               {loading ? 'Creating account...' : 'Create Account →'}
@@ -226,7 +224,6 @@ export default function Register() {
 
           </form>
 
-          {/* Login link */}
           <p className="text-center text-gray-500 text-sm mt-6">
             Already have an account?{' '}
             <Link to="/login" className="text-teal-400 hover:text-teal-300 font-medium">
