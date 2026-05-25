@@ -1,274 +1,469 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { getDepartments, getMaterials, getSubjects } from '../api'
-import MaterialCard from '../components/MaterialCard'
-import { useAuth } from '../context/AuthContext'
+// Browse.jsx
+// Department → Year → Semester → Subject navigation
+// PLUS a global search bar that searches across all subjects instantly
+
+import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { getDepartments, getSubjects } from '../api'
 
 const YEARS = [
-  { value: '', label: 'All Years' },
-  { value: 1, label: '1st Year' },
-  { value: 2, label: '2nd Year' },
-  { value: 3, label: '3rd Year' },
-  { value: 4, label: '4th Year' },
+  { value: 1, label: '1st Year', icon: '🌱' },
+  { value: 2, label: '2nd Year', icon: '📗' },
+  { value: 3, label: '3rd Year', icon: '🔬' },
+  { value: 4, label: '4th Year', icon: '🎓' },
 ]
 
-const SEMESTERS = ['', 1, 2, 3, 4, 5, 6, 7, 8]
-
-const TYPES = [
-  { value: '', label: 'All Types' },
-  { value: 'notes', label: 'Notes' },
-  { value: 'pyq', label: 'PYQ' },
-  { value: 'lab', label: 'Lab Manual' },
-  { value: 'slides', label: 'Slides' },
-  { value: 'reference', label: 'Reference' },
-]
+const SEMESTERS = {
+  1: [1, 2],
+  2: [3, 4],
+  3: [5, 6],
+  4: [7, 8],
+}
 
 export default function Browse() {
-  const { user } = useAuth()
-  const [departments, setDepartments] = useState([])
-  const [subjects, setSubjects] = useState([])
-  const [materials, setMaterials] = useState([])
-  const [filters, setFilters] = useState({
-    department_id: '',
-    year: '',
-    semester: '',
-    subject_id: '',
-    material_type: '',
-    search: '',
-  })
-  const [loading, setLoading] = useState(true)
-  const [loadingSubjects, setLoadingSubjects] = useState(false)
-  const [error, setError] = useState('')
+  const navigate = useNavigate()
 
+  // ── Browse state ──────────────────────────────────────────
+  const [selectedDept, setSelectedDept] = useState(null)
+  const [selectedYear, setSelectedYear] = useState(null)
+  const [selectedSem,  setSelectedSem ] = useState(null)
+  const [departments,  setDepartments ] = useState([])
+  const [subjects,     setSubjects    ] = useState([])
+  const [loadingDepts,    setLoadingDepts   ] = useState(true)
+  const [loadingSubjects, setLoadingSubjects] = useState(false)
+
+  // ── Search state ──────────────────────────────────────────
+  const [searchQuery,   setSearchQuery  ] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searching,     setSearching    ] = useState(false)
+  const [searchMode,    setSearchMode   ] = useState(false)
+  // searchMode = true means user is actively searching
+  // and we show search results instead of browse steps
+
+  // Load departments once on mount
   useEffect(() => {
     getDepartments()
-      .then((res) => setDepartments(res.data))
-      .catch(() => setError('Could not load departments. Check backend and Supabase configuration.'))
+      .then(res => setDepartments(res.data))
+      .finally(() => setLoadingDepts(false))
   }, [])
 
+  // Load subjects when dept + year + sem are all selected
   useEffect(() => {
-    if (!filters.department_id) {
-      setSubjects([])
-      if (filters.subject_id) {
-        setFilters((prev) => ({ ...prev, subject_id: '' }))
-      }
+    if (!selectedDept || !selectedYear || !selectedSem) return
+    setLoadingSubjects(true)
+    getSubjects({
+      department_id: selectedDept.id,
+      year:          selectedYear,
+      semester:      selectedSem
+    })
+      .then(res => setSubjects(res.data))
+      .finally(() => setLoadingSubjects(false))
+  }, [selectedDept, selectedYear, selectedSem])
+
+  // ── Search logic ──────────────────────────────────────────
+  // useCallback prevents this function from being recreated on every render
+  const handleSearch = useCallback(async (query) => {
+    setSearchQuery(query)
+
+    // If query is empty → go back to normal browse mode
+    if (!query.trim()) {
+      setSearchMode(false)
+      setSearchResults([])
       return
     }
 
-    setLoadingSubjects(true)
-    getSubjects({
-      department_id: filters.department_id,
-      year: filters.year || undefined,
-      semester: filters.semester || undefined,
-    })
-      .then((res) => setSubjects(res.data))
-      .catch(() => setSubjects([]))
-      .finally(() => setLoadingSubjects(false))
-  }, [filters.department_id, filters.year, filters.semester, filters.subject_id])
+    // Enter search mode
+    setSearchMode(true)
+    setSearching(true)
 
+    try {
+      // Search across ALL departments at once
+      // We fetch subjects from all departments and filter by name
+      // getSubjects without department_id returns all subjects
+      // We need to search across all departments
+      // So we fetch for each department in parallel using Promise.all
+      const promises = departments.map(dept =>
+        getSubjects({ department_id: dept.id })
+          .then(res => res.data.map(subject => ({
+            ...subject,
+            // Attach department info to each subject for display
+            department_name: dept.name,
+            department_code: dept.code,
+          })))
+          .catch(() => []) // if one dept fails, don't break everything
+      )
+
+      const results = await Promise.all(promises)
+
+      // Flatten array of arrays into one array
+      // [ [subj1, subj2], [subj3] ] → [subj1, subj2, subj3]
+      const allSubjects = results.flat()
+
+      // Filter by search query (case insensitive)
+      const filtered = allSubjects.filter(subject =>
+        subject.name.toLowerCase().includes(query.toLowerCase()) ||
+        subject.code?.toLowerCase().includes(query.toLowerCase()) ||
+        subject.department_name?.toLowerCase().includes(query.toLowerCase()) ||
+        subject.department_code?.toLowerCase().includes(query.toLowerCase())
+      )
+
+      setSearchResults(filtered)
+    } catch (err) {
+      console.log('Search error:', err)
+      setSearchResults([])
+    } finally {
+      setSearching(false)
+    }
+  }, [departments])
+
+  // Debounce search — wait 400ms after user stops typing before searching
+  // This prevents making an API call on every single keystroke
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      setLoading(true)
-      getMaterials({
-        department_id: filters.department_id || undefined,
-        year: filters.year || undefined,
-        semester: filters.semester || undefined,
-        subject_id: filters.subject_id || undefined,
-        material_type: filters.material_type || undefined,
-        search: filters.search || undefined,
-      })
-        .then((res) => setMaterials(res.data))
-        .catch((err) => setError(err.response?.data?.error || 'Could not load materials.'))
-        .finally(() => setLoading(false))
-    }, 250)
+    const timer = setTimeout(() => {
+      if (searchQuery) handleSearch(searchQuery)
+    }, 400)
 
-    return () => clearTimeout(timeoutId)
-  }, [filters])
+    // Cleanup — cancel the timer if user types again before 400ms
+    return () => clearTimeout(timer)
+  }, [searchQuery, handleSearch])
 
-  const selectedDepartment = useMemo(
-    () => departments.find((department) => department.id === filters.department_id),
-    [departments, filters.department_id],
-  )
-
-  const updateFilter = (key, value) => {
-    setError('')
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-      ...(key === 'department_id' || key === 'year' || key === 'semester' ? { subject_id: '' } : {}),
-    }))
+  // Reset browse selections when dept changes
+  const handleDeptSelect = (dept) => {
+    setSelectedDept(dept)
+    setSelectedYear(null)
+    setSelectedSem(null)
+    setSubjects([])
   }
 
-  const clearFilters = () => {
-    setFilters({ department_id: '', year: '', semester: '', subject_id: '', material_type: '', search: '' })
+  const handleYearSelect = (year) => {
+    setSelectedYear(year)
+    setSelectedSem(null)
+    setSubjects([])
   }
+
+  // Clear search and go back to browse
+  const clearSearch = () => {
+    setSearchQuery('')
+    setSearchMode(false)
+    setSearchResults([])
+  }
+
+  // Group search results by department for better display
+  const groupedResults = searchResults.reduce((groups, subject) => {
+    const key = subject.department_code
+    if (!groups[key]) {
+      groups[key] = {
+        name: subject.department_name,
+        code: subject.department_code,
+        subjects: []
+      }
+    }
+    groups[key].subjects.push(subject)
+    return groups
+  }, {})
 
   return (
-    <div className="grid gap-8 xl:grid-cols-[20rem_minmax(0,1fr)]">
-      <aside className="academic-card h-fit rounded-lg p-6 xl:sticky xl:top-24">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-extrabold text-[#0b1c30]">Filters</h2>
-          <button className="text-sm font-extrabold text-[#0052ff]" onClick={clearFilters} type="button">
-            Clear all
-          </button>
-        </div>
+    <div className="min-h-screen bg-gray-950 text-white">
+      <div className="max-w-6xl mx-auto px-4 py-10">
 
-        <div className="space-y-6">
-          <label className="block">
-            <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.16em] text-[#565e74]">
-              Department / Branch
-            </span>
-            <select
-              className="w-full rounded-lg border border-[#c3c5d9] bg-white px-3 py-3 outline-none focus:border-[#0052ff]"
-              onChange={(event) => updateFilter('department_id', event.target.value)}
-              value={filters.department_id}
-            >
-              <option value="">All departments</option>
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name} ({department.code})
-                </option>
-              ))}
-            </select>
-          </label>
+        {/* ── Header ──────────────────────────────────────── */}
+        <h1 className="text-3xl font-black mb-2">Browse Materials</h1>
+        <p className="text-gray-400 mb-8">
+          Search for any subject or navigate by department
+        </p>
 
-          <div>
-            <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.16em] text-[#565e74]">
-              Academic Year
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              {YEARS.map((year) => (
-                <button
-                  className={`rounded-lg border px-3 py-2 text-sm font-bold transition ${
-                    String(filters.year) === String(year.value)
-                      ? 'border-[#0052ff] bg-[#dde1ff] text-[#003ec7]'
-                      : 'border-[#c3c5d9] bg-white text-[#434656]'
-                  }`}
-                  key={year.label}
-                  onClick={() => updateFilter('year', year.value)}
-                  type="button"
-                >
-                  {year.label}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* ── Search Bar ──────────────────────────────────── */}
+        <div className="relative mb-10">
+          <div className="flex items-center bg-gray-900 border border-gray-700 rounded-2xl px-5 py-4 focus-within:border-teal-500 transition-colors">
 
-          <div>
-            <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.16em] text-[#565e74]">
-              Semester
-            </span>
-            <div className="grid grid-cols-3 gap-2">
-              {SEMESTERS.map((semester) => (
-                <button
-                  className={`rounded-lg border px-3 py-2 text-sm font-bold transition ${
-                    String(filters.semester) === String(semester)
-                      ? 'border-[#0052ff] bg-[#0052ff] text-white'
-                      : 'border-[#c3c5d9] bg-white text-[#434656]'
-                  }`}
-                  key={semester || 'all'}
-                  onClick={() => updateFilter('semester', semester)}
-                  type="button"
-                >
-                  {semester || 'All'}
-                </button>
-              ))}
-            </div>
-          </div>
+            {/* Search icon */}
+            <span className="text-gray-500 text-xl mr-3">🔍</span>
 
-          <label className="block">
-            <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.16em] text-[#565e74]">
-              Subject
-            </span>
-            <select
-              className="w-full rounded-lg border border-[#c3c5d9] bg-white px-3 py-3 outline-none focus:border-[#0052ff]"
-              disabled={!filters.department_id || loadingSubjects}
-              onChange={(event) => updateFilter('subject_id', event.target.value)}
-              value={filters.subject_id}
-            >
-              <option value="">
-                {!filters.department_id ? 'Select department first' : loadingSubjects ? 'Loading subjects...' : 'All subjects'}
-              </option>
-              {subjects.map((subject) => (
-                <option key={subject.id} value={subject.id}>
-                  {subject.name} ({subject.code})
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.16em] text-[#565e74]">
-              Resource Type
-            </span>
-            <select
-              className="w-full rounded-lg border border-[#c3c5d9] bg-white px-3 py-3 outline-none focus:border-[#0052ff]"
-              onChange={(event) => updateFilter('material_type', event.target.value)}
-              value={filters.material_type}
-            >
-              {TYPES.map((type) => (
-                <option key={type.value || 'all'} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </aside>
-
-      <section>
-        <div className="mb-8 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-          <div>
-            <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-[#0052ff]">
-              StudyVault / Library {selectedDepartment ? `/ ${selectedDepartment.code}` : ''}
-            </p>
-            <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-[#0b1c30] sm:text-5xl">Material Browser</h1>
-            <p className="mt-4 max-w-2xl text-lg leading-8 text-[#565e74]">
-              Explore approved notes, papers, guides, and student uploads from Supabase.
-            </p>
-          </div>
-          <Link
-            className="flex w-fit items-center gap-3 rounded-lg bg-[#005bbf] px-6 py-4 font-extrabold text-white shadow-xl shadow-blue-900/10 transition hover:bg-[#0052ff]"
-            to={user ? '/upload' : '/login'}
-          >
-            <span className="material-symbols-outlined">upload</span>
-            Upload Material
-          </Link>
-        </div>
-
-        <div className="mb-6">
-          <label className="relative block">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#737688]">search</span>
             <input
-              className="h-12 w-full rounded-full border-0 bg-[#f2f3ff] pl-12 pr-4 outline-none ring-1 ring-transparent transition focus:ring-[#0052ff]/30"
-              onChange={(event) => updateFilter('search', event.target.value)}
-              placeholder="Search by resource title..."
-              type="search"
-              value={filters.search}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search any subject, code, or department..."
+              className="flex-1 bg-transparent text-white placeholder-gray-500 text-base focus:outline-none"
             />
-          </label>
+
+            {/* Clear button — only shows when there's a query */}
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
+                className="text-gray-500 hover:text-white ml-3 text-xl transition-colors"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Search hint */}
+          {!searchMode && (
+            <p className="text-gray-600 text-xs mt-2 ml-1">
+              Try searching "Data Structures", "CS201", "ECE", or "Machine Learning"
+            </p>
+          )}
         </div>
 
-        {error && <div className="mb-6 rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
+        {/* ── SEARCH RESULTS MODE ─────────────────────────── */}
+        {searchMode && (
+          <div>
+            {/* Back to browse button */}
+            <button
+              onClick={clearSearch}
+              className="text-gray-500 hover:text-white text-sm mb-6 flex items-center gap-2 transition-colors"
+            >
+              ← Back to Browse
+            </button>
 
-        {loading ? (
-          <div className="academic-card rounded-lg p-12 text-center text-[#565e74]">Loading materials...</div>
-        ) : materials.length === 0 ? (
-          <div className="academic-card rounded-lg p-12 text-center">
-            <span className="material-symbols-outlined mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-[#dde1ff] text-[#003ec7]">
-              inventory_2
-            </span>
-            <h2 className="text-2xl font-extrabold text-[#0b1c30]">No materials found</h2>
-            <p className="mt-2 text-[#565e74]">Try changing filters or upload a resource for this subject.</p>
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-            {materials.map((material) => (
-              <MaterialCard key={material.id} material={material} />
+            {/* Searching spinner */}
+            {searching && (
+              <div className="flex items-center gap-3 text-gray-400 mb-6">
+                <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                Searching across all departments...
+              </div>
+            )}
+
+            {/* Results count */}
+            {!searching && (
+              <p className="text-gray-500 text-sm mb-6">
+                {searchResults.length === 0
+                  ? `No subjects found for "${searchQuery}"`
+                  : `${searchResults.length} subjects found for "${searchQuery}"`
+                }
+              </p>
+            )}
+
+            {/* No results state */}
+            {!searching && searchResults.length === 0 && (
+              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-16 text-center">
+                <div className="text-5xl mb-4">🔍</div>
+                <p className="text-gray-400 font-medium text-lg">No subjects found</p>
+                <p className="text-gray-600 text-sm mt-2">
+                  Try a different keyword or browse by department below
+                </p>
+                <button
+                  onClick={clearSearch}
+                  className="mt-6 bg-teal-500 hover:bg-teal-600 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors"
+                >
+                  Browse by Department
+                </button>
+              </div>
+            )}
+
+            {/* Grouped results by department */}
+            {!searching && Object.values(groupedResults).map(group => (
+              <div key={group.code} className="mb-8">
+
+                {/* Department header */}
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="bg-teal-500/10 border border-teal-500/20 text-teal-400 text-xs font-bold px-3 py-1 rounded-full">
+                    {group.code}
+                  </span>
+                  <span className="text-gray-400 text-sm">{group.name}</span>
+                  <span className="text-gray-600 text-xs">
+                    {group.subjects.length} result{group.subjects.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+
+                {/* Subjects in this department */}
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                  {group.subjects.map((subject, index) => (
+                    <button
+                      key={subject.id}
+                      onClick={() => navigate(`/subject/${subject.id}`)}
+                      className={`w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-800 transition-colors ${
+                        index !== group.subjects.length - 1
+                          ? 'border-b border-gray-800'
+                          : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-teal-500/10 rounded-xl flex items-center justify-center text-lg flex-shrink-0">
+                          📘
+                        </div>
+                        <div>
+                          {/* Highlight matching text in subject name */}
+                          <div className="font-semibold text-white">
+                            {highlightMatch(subject.name, searchQuery)}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            {subject.code} · Year {subject.year} · Sem {subject.semester}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-gray-600 flex-shrink-0">→</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
-      </section>
+
+        {/* ── BROWSE MODE ─────────────────────────────────── */}
+        {!searchMode && (
+          <div>
+
+            {/* Step 1 — Department */}
+            <section className="mb-10">
+              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
+                Step 1 — Select Department
+              </h2>
+              {loadingDepts ? (
+                <p className="text-gray-500">Loading departments...</p>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {departments.map(dept => (
+                    <button
+                      key={dept.id}
+                      onClick={() => handleDeptSelect(dept)}
+                      className={`p-4 rounded-xl border text-left transition-all ${
+                        selectedDept?.id === dept.id
+                          ? 'bg-teal-500/20 border-teal-500 text-teal-300'
+                          : 'bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="font-bold text-sm">{dept.code}</div>
+                      <div className="text-xs text-gray-500 mt-1 leading-snug">
+                        {dept.name}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Step 2 — Year */}
+            {selectedDept && (
+              <section className="mb-10">
+                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
+                  Step 2 — Select Year
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {YEARS.map(y => (
+                    <button
+                      key={y.value}
+                      onClick={() => handleYearSelect(y.value)}
+                      className={`p-4 rounded-xl border text-left transition-all ${
+                        selectedYear === y.value
+                          ? 'bg-teal-500/20 border-teal-500 text-teal-300'
+                          : 'bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="text-2xl mb-1">{y.icon}</div>
+                      <div className="font-bold text-sm">{y.label}</div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Step 3 — Semester */}
+            {selectedYear && (
+              <section className="mb-10">
+                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
+                  Step 3 — Select Semester
+                </h2>
+                <div className="flex gap-3">
+                  {SEMESTERS[selectedYear].map(sem => (
+                    <button
+                      key={sem}
+                      onClick={() => setSelectedSem(sem)}
+                      className={`px-6 py-3 rounded-xl border font-bold transition-all ${
+                        selectedSem === sem
+                          ? 'bg-teal-500/20 border-teal-500 text-teal-300'
+                          : 'bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-600'
+                      }`}
+                    >
+                      Semester {sem}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Step 4 — Subjects */}
+            {selectedSem && (
+              <section>
+                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
+                  Step 4 — Select Subject
+                </h2>
+
+                {loadingSubjects ? (
+                  <div className="flex items-center gap-3 text-gray-400">
+                    <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                    Loading subjects...
+                  </div>
+                ) : subjects.length === 0 ? (
+                  <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center">
+                    <div className="text-4xl mb-3">📭</div>
+                    <p className="text-gray-400">No subjects found</p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                    {subjects.map((subject, index) => (
+                      <button
+                        key={subject.id}
+                        onClick={() => navigate(`/subject/${subject.id}`)}
+                        className={`w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-800 transition-colors ${
+                          index !== subjects.length - 1
+                            ? 'border-b border-gray-800'
+                            : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 bg-teal-500/10 rounded-xl flex items-center justify-center text-lg">
+                            📘
+                          </div>
+                          <div>
+                            <div className="font-semibold text-white">
+                              {subject.name}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {subject.code} · Sem {subject.semester}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-gray-600">→</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+          </div>
+        )}
+
+      </div>
     </div>
+  )
+}
+
+// Helper function — highlights the matching part of text in yellow
+// e.g. searching "data" in "Data Structures" wraps "Data" in a yellow span
+function highlightMatch(text, query) {
+  if (!query) return text
+
+  // Find where the match starts (case insensitive)
+  const index = text.toLowerCase().indexOf(query.toLowerCase())
+
+  if (index === -1) return text  // no match found
+
+  // Split into three parts: before match, the match, after match
+  const before = text.substring(0, index)
+  const match  = text.substring(index, index + query.length)
+  const after  = text.substring(index + query.length)
+
+  return (
+    <>
+      {before}
+      <span className="bg-teal-500/30 text-teal-300 rounded px-0.5">
+        {match}
+      </span>
+      {after}
+    </>
   )
 }
