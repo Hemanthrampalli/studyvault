@@ -3,7 +3,7 @@
 // PLUS a global search bar that searches across all subjects instantly
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getDepartments, getSubjects } from '../api'
 
 const YEARS = [
@@ -41,11 +41,22 @@ export default function Browse() {
   // and we show search results instead of browse steps
 
   // Load departments once on mount
-  useEffect(() => {
-    getDepartments()
-      .then(res => setDepartments(res.data))
-      .finally(() => setLoadingDepts(false))
-  }, [])
+  // Read ?search= from URL (coming from Home page search)
+const [searchParams] = useSearchParams()
+
+// Load departments on mount
+useEffect(() => {
+  getDepartments()
+    .then(res => {
+      setDepartments(res.data)
+      // If URL has ?search=something, pre-fill the search box
+      const urlSearch = searchParams.get('search')
+      if (urlSearch) {
+        setSearchQuery(urlSearch)
+      }
+    })
+    .finally(() => setLoadingDepts(false))
+}, [])
 
   // Load subjects when dept + year + sem are all selected
   useEffect(() => {

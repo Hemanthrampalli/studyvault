@@ -1,11 +1,20 @@
-// Home.jsx
-// Landing page — first thing users see
-
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function Home() {
-  const { user } = useAuth()
+  const { user }   = useAuth()
+  const navigate   = useNavigate()
+  const [query, setQuery] = useState('')
+
+  const handleSearch = (e) => {
+    e.preventDefault()
+    if (!query.trim()) return
+
+    // Navigate to browse page with search query in URL
+    // Browse page will read this and auto-trigger search
+    navigate(`/browse?search=${encodeURIComponent(query.trim())}`)
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -27,15 +36,56 @@ export default function Home() {
           organised by department, year, semester and subject.
         </p>
 
-        <div className="flex gap-4 justify-center flex-wrap">
+        {/* Search Bar */}
+        <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-6">
+          <div className="flex items-center bg-gray-900 border border-gray-700 rounded-2xl px-5 py-4 focus-within:border-teal-500 transition-colors gap-3">
+            <span className="text-gray-500 text-xl flex-shrink-0">🔍</span>
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search any subject, e.g. Data Structures, Machine Learning..."
+              className="flex-1 bg-transparent text-white placeholder-gray-500 text-base focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={!query.trim()}
+              className="bg-teal-500 hover:bg-teal-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors flex-shrink-0"
+            >
+              Search
+            </button>
+          </div>
+
+          {/* Quick search suggestions */}
+          <div className="flex flex-wrap gap-2 justify-center mt-4">
+            {[
+              'Data Structures',
+              'Machine Learning',
+              'Computer Networks',
+              'DBMS',
+              'Operating Systems',
+              'Deep Learning',
+            ].map(suggestion => (
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() => navigate(`/browse?search=${encodeURIComponent(suggestion)}`)}
+                className="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 hover:text-white text-xs px-3 py-1.5 rounded-full transition-colors"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        </form>
+
+        {/* CTA Buttons */}
+        <div className="flex gap-4 justify-center flex-wrap mt-8">
           <Link
             to="/browse"
-            className="bg-teal-500 hover:bg-teal-600 text-white font-bold px-8 py-4 rounded-xl text-lg transition-colors"
+            className="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white font-bold px-8 py-4 rounded-xl text-lg transition-colors"
           >
-            Browse Materials →
+            Browse by Department
           </Link>
-
-          {/* Show register only if not logged in */}
           {!user && (
             <Link
               to="/register"
@@ -51,10 +101,10 @@ export default function Home() {
       <div className="max-w-4xl mx-auto px-4 pb-16">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: 'Departments',  value: '8',   icon: '🏛️' },
-            { label: 'Subjects',     value: '40+', icon: '📚' },
-            { label: 'BTech Years',  value: '4',   icon: '🎓' },
-            { label: 'Semesters',    value: '8',   icon: '📅' },
+            { label: 'Departments', value: '8',   icon: '🏛️' },
+            { label: 'Subjects',    value: '320+', icon: '📚' },
+            { label: 'BTech Years', value: '4',   icon: '🎓' },
+            { label: 'Semesters',   value: '8',   icon: '📅' },
           ].map(stat => (
             <div
               key={stat.label}
