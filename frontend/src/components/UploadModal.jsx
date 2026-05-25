@@ -1,198 +1,161 @@
-// UploadModal.jsx
-// Modal popup for uploading a new material
-// Only shown to logged in users
-
-import { useState, useRef } from 'react'
+import { useRef, useState } from 'react'
 import { uploadMaterial } from '../api'
 
 const MATERIAL_TYPES = [
-  { value: 'notes',     label: 'Notes',      icon: '📝' },
-  { value: 'pyq',       label: 'PYQ',        icon: '📋' },
-  { value: 'lab',       label: 'Lab Manual', icon: '🧪' },
-  { value: 'slides',    label: 'Slides',     icon: '🖥️' },
-  { value: 'reference', label: 'Reference',  icon: '📚' },
+  { value: 'notes', label: 'Notes' },
+  { value: 'pyq', label: 'Previous Questions' },
+  { value: 'lab', label: 'Lab Manual' },
+  { value: 'slides', label: 'Slides' },
+  { value: 'reference', label: 'Reference' },
 ]
 
 export default function UploadModal({ subjectId, onClose, onSuccess }) {
-  const fileRef = useRef()
-
-  const [form, setForm] = useState({
-    title:         '',
-    description:   '',
-    material_type: 'notes',
-  })
-  const [file,     setFile    ] = useState(null)
-  const [loading,  setLoading ] = useState(false)
-  const [error,    setError   ] = useState('')
+  const fileRef = useRef(null)
+  const [form, setForm] = useState({ title: '', description: '', material_type: 'notes' })
+  const [file, setFile] = useState(null)
   const [dragOver, setDragOver] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleChange = (e) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
-  }
-
-  // Handle drag and drop
-  const handleDrop = (e) => {
-    e.preventDefault()
-    setDragOver(false)
-    const dropped = e.dataTransfer.files[0]
-    if (dropped) setFile(dropped)
+  const updateField = (event) => {
+    setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }))
   }
 
   const handleSubmit = async () => {
-    if (!file)             return setError('Please select a file')
-    if (!form.title)       return setError('Please enter a title')
-    if (!form.material_type) return setError('Please select material type')
+    if (!file) return setError('Please select a file.')
+    if (!form.title.trim()) return setError('Please enter a resource title.')
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('subject_id', subjectId)
+    formData.append('title', form.title.trim())
+    formData.append('description', form.description.trim())
+    formData.append('material_type', form.material_type)
 
     setLoading(true)
     setError('')
-
-    // FormData is used for sending files (can't use regular JSON)
-    // Think of it like a form with file attached
-    const formData = new FormData()
-    formData.append('file',          file)
-    formData.append('subject_id',    subjectId)
-    formData.append('title',         form.title)
-    formData.append('description',   form.description)
-    formData.append('material_type', form.material_type)
-
     try {
       const res = await uploadMaterial(formData)
-      onSuccess(res.data)  // pass new material back to parent
+      onSuccess?.(res.data)
       onClose()
     } catch (err) {
-      setError(err.response?.data?.error || 'Upload failed. Try again.')
+      setError(err.response?.data?.error || 'Upload failed. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    // Backdrop — clicking outside closes modal
     <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#131b2e]/70 p-4 backdrop-blur-sm"
+      onClick={(event) => event.target === event.currentTarget && onClose()}
     >
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md">
-
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-white text-xl font-bold">Upload Material</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-white w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            ✕
+      <div className="w-full max-w-xl rounded-lg bg-white p-6 shadow-2xl">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-extrabold text-[#131b2e]">Upload Material</h2>
+            <p className="mt-1 text-sm text-[#565e74]">Share notes, slides, question papers, or lab files.</p>
+          </div>
+          <button className="rounded-full p-2 text-[#737688] hover:bg-[#f2f3ff]" onClick={onClose} type="button">
+            <span className="material-symbols-outlined">close</span>
           </button>
         </div>
 
-        {/* Error */}
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm px-4 py-3 rounded-lg mb-4">
-            {error}
-          </div>
-        )}
+        {error && <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
 
         <div className="space-y-4">
-
-          {/* File drop zone */}
           <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handleDrop}
-            onClick={() => fileRef.current?.click()}
-            className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
-              dragOver
-                ? 'border-teal-500 bg-teal-500/5'
-                : 'border-gray-700 hover:border-gray-600'
+            className={`rounded-lg border-2 border-dashed p-6 text-center transition ${
+              dragOver ? 'border-[#0052ff] bg-[#eff4ff]' : 'border-[#c3c5d9] bg-[#faf8ff]'
             }`}
+            onClick={() => fileRef.current?.click()}
+            onDragLeave={() => setDragOver(false)}
+            onDragOver={(event) => {
+              event.preventDefault()
+              setDragOver(true)
+            }}
+            onDrop={(event) => {
+              event.preventDefault()
+              setDragOver(false)
+              setFile(event.dataTransfer.files?.[0] || null)
+            }}
           >
             <input
               ref={fileRef}
-              type="file"
+              accept=".pdf,.ppt,.pptx,.doc,.docx,.zip,.png,.jpg,.jpeg"
               className="hidden"
-              accept=".pdf,.ppt,.pptx,.doc,.docx,.zip"
-              onChange={(e) => setFile(e.target.files[0])}
+              onChange={(event) => setFile(event.target.files?.[0] || null)}
+              type="file"
             />
-            <div className="text-3xl mb-2">{file ? '✅' : '📁'}</div>
-            <div className="text-white text-sm font-medium">
-              {file ? file.name : 'Drop file here or click to browse'}
-            </div>
-            <div className="text-gray-500 text-xs mt-1">
-              {file
-                ? `${(file.size / (1024*1024)).toFixed(2)} MB`
-                : 'PDF, PPT, DOC, ZIP · Max 50MB'}
-            </div>
+            <span className="material-symbols-outlined mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-lg bg-[#dde1ff] text-[#003ec7]">
+              upload_file
+            </span>
+            <p className="font-bold text-[#131b2e]">{file ? file.name : 'Drag and drop files'}</p>
+            <p className="mt-1 text-sm text-[#565e74]">PDF, DOCX, PPTX, ZIP, or images up to 50 MB</p>
           </div>
 
-          {/* Title */}
-          <div>
-            <label className="text-gray-400 text-sm font-medium block mb-2">
-              Title
-            </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-extrabold uppercase tracking-[0.14em] text-[#565e74]">
+              Resource Title
+            </span>
             <input
-              type="text"
+              className="w-full rounded-lg border border-[#c3c5d9] px-4 py-3 outline-none transition focus:border-[#0052ff] focus:ring-2 focus:ring-[#0052ff]/10"
               name="title"
+              onChange={updateField}
+              placeholder="Advanced Thermodynamics Lecture Notes"
               value={form.title}
-              onChange={handleChange}
-              placeholder="e.g. Unit 1 Notes - Matrices"
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-teal-500 transition-colors"
             />
-          </div>
+          </label>
 
-          {/* Material Type */}
-          <div>
-            <label className="text-gray-400 text-sm font-medium block mb-2">
-              Material Type
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {MATERIAL_TYPES.map(t => (
-                <button
-                  key={t.value}
-                  onClick={() => setForm(prev => ({ ...prev, material_type: t.value }))}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    form.material_type === t.value
-                      ? 'bg-teal-500 text-white'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                  }`}
-                >
-                  {t.icon} {t.label}
-                </button>
+          <label className="block">
+            <span className="mb-1 block text-xs font-extrabold uppercase tracking-[0.14em] text-[#565e74]">
+              Resource Type
+            </span>
+            <select
+              className="w-full rounded-lg border border-[#c3c5d9] px-4 py-3 outline-none transition focus:border-[#0052ff] focus:ring-2 focus:ring-[#0052ff]/10"
+              name="material_type"
+              onChange={updateField}
+              value={form.material_type}
+            >
+              {MATERIAL_TYPES.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
               ))}
-            </div>
-          </div>
+            </select>
+          </label>
 
-          {/* Description (optional) */}
-          <div>
-            <label className="text-gray-400 text-sm font-medium block mb-2">
-              Description <span className="text-gray-600">(optional)</span>
-            </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-extrabold uppercase tracking-[0.14em] text-[#565e74]">
+              Description
+            </span>
             <textarea
+              className="w-full resize-none rounded-lg border border-[#c3c5d9] px-4 py-3 outline-none transition focus:border-[#0052ff] focus:ring-2 focus:ring-[#0052ff]/10"
               name="description"
+              onChange={updateField}
+              placeholder="Mention key units, exam year, or important topics."
+              rows={3}
               value={form.description}
-              onChange={handleChange}
-              placeholder="Brief description of what's covered..."
-              rows={2}
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-teal-500 transition-colors resize-none"
             />
-          </div>
+          </label>
 
-          {/* Buttons */}
           <div className="flex gap-3 pt-2">
             <button
+              className="flex-1 rounded-lg border border-[#0052ff] px-4 py-3 font-bold text-[#003ec7] transition hover:bg-[#eff4ff]"
               onClick={onClose}
-              className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium py-3 rounded-xl transition-colors text-sm"
+              type="button"
             >
               Cancel
             </button>
             <button
-              onClick={handleSubmit}
+              className="flex-[2] rounded-lg bg-[#003ec7] px-4 py-3 font-bold text-white shadow-lg shadow-blue-900/10 transition hover:bg-[#0052ff] disabled:opacity-60"
               disabled={loading}
-              className="flex-2 flex-grow-[2] bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-colors text-sm"
+              onClick={handleSubmit}
+              type="button"
             >
-              {loading ? 'Uploading...' : '⬆ Upload'}
+              {loading ? 'Uploading...' : 'Publish Material'}
             </button>
           </div>
-
         </div>
       </div>
     </div>

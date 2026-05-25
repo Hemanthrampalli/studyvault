@@ -1,71 +1,62 @@
 const express = require('express')
 const router = express.Router()
 const supabase = require('../supabase')
+const requireAuth = require('../middleware/auth')
 
-// ─── REGISTER ─────────────────────────────────────────────────
+function buildProfilePayload(body, user) {
+  const payload = {
+    id: user.id,
+    email: user.email,
+    name: body.name,
+  }
+
+  if (body.department_id) payload.department_id = body.department_id
+  if (body.year) payload.year = parseInt(body.year, 10)
+  if (body.roll_number) payload.roll_number = body.roll_number
+
+  return payload
+}
+
 router.post('/register', async (req, res) => {
-  console.log('Register attempt:', req.body)
-
-  const { name, email, password, department_id, year, roll_number } = req.body
+  const { name, email, password } = req.body
 
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'Name, email and password are required' })
   }
 
   try {
-    // Step 1: Create user in Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { name }
-      }
+        data: { name },
+      },
     })
 
     if (authError) {
-      console.log('Auth error:', authError)
       return res.status(400).json({ error: authError.message })
     }
 
-    console.log('User created:', authData.user.id)
-
-    // Step 2: Wait for trigger to create profile row
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    // Step 3: Update profile with extra details
-    const profileUpdate = { name }
-
-    if (department_id && department_id !== '') {
-      profileUpdate.department_id = department_id
-    }
-    if (year && year !== '') {
-      profileUpdate.year = parseInt(year)
-    }
-    if (roll_number && roll_number !== '') {
-      profileUpdate.roll_number = roll_number
-    }
+    const profilePayload = buildProfilePayload(req.body, authData.user)
 
     const { error: profileError } = await supabase
       .from('profiles')
-      .update(profileUpdate)
-      .eq('id', authData.user.id)
+      .upsert(profilePayload, { onConflict: 'id' })
 
     if (profileError) {
-      console.log('Profile update error:', profileError)
+      return res.status(500).json({ error: profileError.message })
     }
 
     res.json({
-      message: 'Account created successfully!',
-      user: authData.user
+      message: 'Account created successfully',
+      user: authData.user,
     })
-
   } catch (err) {
-    console.log('Register catch error:', err)
+    console.error('Register error:', err)
     res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
-// ─── LOGIN ────────────────────────────────────────────────────
 router.post('/login', async (req, res) => {
   const { email, password } = req.body
 
@@ -74,54 +65,76 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
       return res.status(400).json({ error: 'Invalid email or password' })
     }
 
-    // Fetch full profile
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*, departments(name, code)')
       .eq('id', data.user.id)
       .single()
 
+    if (profileError && profileError.code !== 'PGRST116') {
+      return res.status(500).json({ error: profileError.message })
+    }
+
     res.json({
       token: data.session.access_token,
       user: {
-        id:      data.user.id,
-        email:   data.user.email,
-        profile
-      }
+        id: data.user.id,
+        email: data.user.email,
+        profile: profile || {
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.user_metadata?.name || data.user.email,
+        },
+      },
     })
-
   } catch (err) {
-    console.log('Login error:', err)
+    console.error('Login error:', err)
     res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
-// ─── GET PROFILE ──────────────────────────────────────────────
-router.get('/profile', async (req, res) => {
-  const authHeader = req.headers.authorization
-  if (!authHeader) return res.status(401).json({ error: 'Not logged in' })
-
-  const token = authHeader.split(' ')[1]
-
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-  if (error) return res.status(401).json({ error: 'Invalid session' })
-
-  const { data: profile } = await supabase
+router.get('/profile', requireAuth, async (req, res) => {
+  const { data: profile, error } = await supabase
     .from('profiles')
     .select('*, departments(name, code)')
-    .eq('id', user.id)
+    .eq('id', req.user.id)
     .single()
 
+  if (error) {
+    return res.status(500).json({ error: error.message })
+  }
+
   res.json(profile)
+})
+
+router.patch('/profile', requireAuth, async (req, res) => {
+  const allowedFields = ['name', 'department_id', 'year', 'roll_number', 'settings']
+  const payload = {}
+
+  allowedFields.forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+      payload[field] = field === 'year' && req.body[field] ? parseInt(req.body[field], 10) : req.body[field]
+    }
+  })
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(payload)
+    .eq('id', req.user.id)
+    .select('*, departments(name, code)')
+    .single()
+
+  if (error) {
+    return res.status(500).json({ error: error.message })
+  }
+
+  res.json(data)
 })
 
 module.exports = router

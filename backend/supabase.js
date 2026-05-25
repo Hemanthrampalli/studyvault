@@ -1,13 +1,29 @@
-// This file creates ONE connection to Supabase
-// We export it so every route file can use the same connection
-// Instead of creating a new connection in every file
-
 const { createClient } = require('@supabase/supabase-js')
-require('dotenv').config()  // loads all values from .env file into process.env
+const path = require('path')
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,         // reads SUPABASE_URL from .env
-  process.env.SUPABASE_SERVICE_KEY  // reads SUPABASE_SERVICE_KEY from .env
-)
+require('dotenv').config({
+  path: path.join(__dirname, '.env'),
+})
 
-module.exports = supabase  // export so other files can import it
+const supabaseUrl = process.env.SUPABASE_URL?.trim()
+const supabaseServiceKey = (
+  process.env.SUPABASE_SERVICE_KEY ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)?.trim()
+
+const missingEnv = []
+if (!supabaseUrl || supabaseUrl.includes('your-project-ref')) missingEnv.push('SUPABASE_URL')
+if (!supabaseServiceKey || supabaseServiceKey.includes('your-service-role-key')) {
+  missingEnv.push('SUPABASE_SERVICE_KEY or SUPABASE_SERVICE_ROLE_KEY')
+}
+
+if (missingEnv.length > 0) {
+  throw new Error(
+    `Missing Supabase environment value(s): ${missingEnv.join(', ')}. ` +
+      'Create backend/.env from backend/.env.example and restart the backend.',
+  )
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+module.exports = supabase

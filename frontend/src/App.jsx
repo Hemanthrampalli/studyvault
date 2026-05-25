@@ -1,44 +1,86 @@
-// App.jsx
-// Defines all the pages/routes of our app
-// React Router reads the URL and shows the matching page
-
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
-import Navbar from './components/Navbar'
+import AppShell from './components/AppShell'
 import ProtectedRoute from './components/ProtectedRoute'
-
-// Import all pages
-import Home from './pages/Home'
-import Login from './pages/Login'
-import Register from './pages/Register'
 import Browse from './pages/Browse'
-import Subject from './pages/Subject'
+import Dashboard from './pages/Dashboard'
+import Login from './pages/Login'
+import MaterialDetail from './pages/MaterialDetail'
 import Profile from './pages/Profile'
+import Register from './pages/Register'
+import Subject from './pages/Subject'
+import UploadMaterial from './pages/UploadMaterial'
+
+function ShellRoute({ children }) {
+  return <AppShell>{children}</AppShell>
+}
+
+function ProtectedShellRoute({ children }) {
+  return (
+    <ProtectedRoute>
+      <AppShell>{children}</AppShell>
+    </ProtectedRoute>
+  )
+}
 
 export default function App() {
   return (
-    // AuthProvider wraps everything so all pages can access user state
     <AuthProvider>
       <BrowserRouter>
-        {/* Navbar shows on every page */}
-        <Navbar />
-
         <Routes>
-          {/* Public routes — anyone can visit */}
-          <Route path="/"         element={<Home />} />
-          <Route path="/login"    element={<Login />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/browse"   element={<Browse />} />
 
-          {/* subject_id comes from URL e.g. /subject/abc-123 */}
-          <Route path="/subject/:subject_id" element={<Subject />} />
-
-          {/* Protected route — must be logged in */}
-          <Route path="/profile" element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          } />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedShellRoute>
+                <Dashboard />
+              </ProtectedShellRoute>
+            }
+          />
+          <Route
+            path="/browse"
+            element={
+              <ShellRoute>
+                <Browse />
+              </ShellRoute>
+            }
+          />
+          <Route
+            path="/subject/:subject_id"
+            element={
+              <ShellRoute>
+                <Subject />
+              </ShellRoute>
+            }
+          />
+          <Route
+            path="/materials/:id"
+            element={
+              <ShellRoute>
+                <MaterialDetail />
+              </ShellRoute>
+            }
+          />
+          <Route
+            path="/upload"
+            element={
+              <ProtectedShellRoute>
+                <UploadMaterial />
+              </ProtectedShellRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedShellRoute>
+                <Profile />
+              </ProtectedShellRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/browse" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

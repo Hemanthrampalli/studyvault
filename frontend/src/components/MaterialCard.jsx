@@ -1,78 +1,94 @@
+import { Link } from 'react-router-dom'
 import { trackDownload } from '../api'
 import { useAuth } from '../context/AuthContext'
 
 const TYPE_CONFIG = {
-  notes:     { icon: '📝', label: 'Notes',      color: 'teal'   },
-  pyq:       { icon: '📋', label: 'PYQ',        color: 'yellow' },
-  lab:       { icon: '🧪', label: 'Lab Manual', color: 'red'    },
-  slides:    { icon: '🖥️', label: 'Slides',     color: 'blue'   },
-  reference: { icon: '📚', label: 'Reference',  color: 'purple' },
+  notes: { icon: 'description', label: 'Notes', tone: 'bg-blue-50 text-blue-700' },
+  lecture_note: { icon: 'description', label: 'Lecture Note', tone: 'bg-blue-50 text-blue-700' },
+  pyq: { icon: 'assignment', label: 'PYQ', tone: 'bg-amber-50 text-amber-700' },
+  lab: { icon: 'science', label: 'Lab Manual', tone: 'bg-red-50 text-red-700' },
+  slides: { icon: 'slideshow', label: 'Slides', tone: 'bg-orange-50 text-orange-700' },
+  reference: { icon: 'menu_book', label: 'Reference', tone: 'bg-violet-50 text-violet-700' },
+  dataset: { icon: 'table_chart', label: 'Dataset', tone: 'bg-emerald-50 text-emerald-700' },
 }
 
-function formatSize(bytes) {
+export function formatSize(bytes) {
   if (!bytes) return 'Unknown size'
-  if (bytes < 1024)        return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function formatDate(dateStr) {
+export function formatDate(dateStr) {
+  if (!dateStr) return 'Unknown date'
   return new Date(dateStr).toLocaleDateString('en-IN', {
-    day:   'numeric',
+    day: 'numeric',
     month: 'short',
-    year:  'numeric'
+    year: 'numeric',
   })
 }
 
-export default function MaterialCard({ material, onDownload }) {
-  const { user }  = useAuth()
-  const typeInfo  = TYPE_CONFIG[material.material_type] || TYPE_CONFIG.notes
+export function getTypeInfo(type) {
+  return TYPE_CONFIG[type] || TYPE_CONFIG.notes
+}
 
-  const handleDownload = async () => {
+export default function MaterialCard({ material, onDownload }) {
+  const { user } = useAuth()
+  const typeInfo = getTypeInfo(material.material_type)
+
+  const handleDownload = async (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+
     if (user) {
-      try { await trackDownload(material.id) } catch {}
+      try {
+        await trackDownload(material.id)
+      } catch (err) {
+        console.warn('Download tracking failed:', err)
+      }
     }
+
     onDownload?.(material.id)
-    window.open(material.file_url, '_blank')
+    window.open(material.file_url, '_blank', 'noopener,noreferrer')
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-gray-700 transition-all">
-
-      <div className="flex items-start gap-3 mb-4">
-        <div className="w-11 h-11 bg-gray-800 rounded-xl flex items-center justify-center text-xl flex-shrink-0">
-          {typeInfo.icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="text-white font-semibold text-sm leading-snug mb-1 line-clamp-2">
-            {material.title}
-          </h3>
-          <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-400">
-            {typeInfo.label}
-          </span>
-        </div>
+    <Link
+      className="academic-card group flex min-h-[19rem] flex-col rounded-lg p-5 transition hover:-translate-y-0.5 hover:border-[#0052ff]/45 hover:shadow-xl hover:shadow-blue-900/10"
+      to={`/materials/${material.id}`}
+    >
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <span className={`inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-extrabold ${typeInfo.tone}`}>
+          <span className="material-symbols-outlined text-[18px]">{typeInfo.icon}</span>
+          {typeInfo.label}
+        </span>
+        <span className="flex items-center gap-1 text-sm font-bold text-[#9e4300]">
+          <span className="material-symbols-outlined icon-filled text-[18px]">star</span>
+          {material.rating || '4.8'}
+        </span>
       </div>
 
-      {material.description && (
-        <p className="text-gray-500 text-xs mb-4 line-clamp-2">
-          {material.description}
-        </p>
-      )}
+      <h3 className="line-clamp-2 text-xl font-bold leading-snug text-[#0b1c30]">{material.title}</h3>
+      <p className="line-clamp-3 mt-3 flex-1 text-sm leading-6 text-[#565e74]">
+        {material.description || 'Community-contributed academic material for this subject.'}
+      </p>
 
-      <div className="flex flex-wrap gap-3 text-xs text-gray-500 mb-4">
-        <span>👤 {material.uploader_name || 'Anonymous'}</span>
-        <span>📦 {formatSize(material.file_size)}</span>
-        <span>⬇️ {material.downloads} downloads</span>
-        <span>📅 {formatDate(material.created_at)}</span>
+      <div className="mt-5 flex items-end justify-between gap-4 border-t border-[#c3c5d9]/70 pt-4">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-[#0b1c30]">
+            {material.uploader_name || material.profiles?.name || 'Anonymous'}
+          </p>
+          <p className="mt-1 text-xs text-[#737688]">{formatDate(material.created_at)}</p>
+        </div>
+        <button
+          className="flex shrink-0 items-center gap-2 rounded-lg bg-[#eff4ff] px-3 py-2 text-sm font-extrabold text-[#005bbf] transition group-hover:bg-[#005bbf] group-hover:text-white"
+          onClick={handleDownload}
+          type="button"
+        >
+          <span className="material-symbols-outlined text-[18px]">download</span>
+          {formatSize(material.file_size)}
+        </button>
       </div>
-
-      <button
-        onClick={handleDownload}
-        className="w-full bg-teal-500 hover:bg-teal-600 text-white text-sm font-bold py-2.5 rounded-xl transition-colors"
-      >
-        ⬇ Download {material.file_type?.toUpperCase()}
-      </button>
-
-    </div>
+    </Link>
   )
 }
