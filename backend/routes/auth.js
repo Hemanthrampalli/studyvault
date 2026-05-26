@@ -136,5 +136,42 @@ router.patch('/profile', requireAuth, async (req, res) => {
 
   res.json(data)
 })
+ // PATCH /api/auth/profile — update logged in user's profile
+router.patch('/profile', async (req, res) => {
+  const authHeader = req.headers.authorization
+  if (!authHeader) return res.status(401).json({ error: 'Not logged in' })
+
+  const token = authHeader.split(' ')[1]
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+  if (authError || !user) return res.status(401).json({ error: 'Invalid session' })
+
+  const { name, department_id, year, roll_number } = req.body
+
+  const updates = {}
+  if (name)          updates.name          = name
+  if (department_id) updates.department_id = department_id
+  if (year)          updates.year          = parseInt(year)
+  if (roll_number)   updates.roll_number   = roll_number
+
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update(updates)
+    .eq('id', user.id)
+
+  if (updateError) {
+    return res.status(500).json({ error: updateError.message })
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*, departments(name, code)')
+    .eq('id', user.id)
+    .single()
+
+  res.json(profile)
+})
+
+module.exports = router
 
 module.exports = router
