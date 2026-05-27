@@ -88,7 +88,7 @@ export default function Subject() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen  text-white">
       <div className="max-w-6xl mx-auto px-4 py-10">
 
         {/* Back button */}
@@ -141,7 +141,7 @@ export default function Subject() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search materials..."
-            className="flex-1 min-w-48 bg-gray-900 border border-gray-800 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-500 transition-colors"
+            className="flex-1 min-w-48  border border-gray-800 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-teal-500 transition-colors"
           />
           <div className="flex flex-wrap gap-2">
             {TYPE_FILTERS.map(f => (
@@ -151,7 +151,7 @@ export default function Subject() {
                 className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                   filter === f.value
                     ? 'bg-teal-500 text-white'
-                    : 'bg-gray-900 border border-gray-800 text-gray-400 hover:border-gray-600'
+                    : 'border border-gray-800 text-gray-400 hover:border-gray-600'
                 }`}
               >
                 {f.label}
@@ -162,7 +162,7 @@ export default function Subject() {
 
         {/* Materials Grid */}
         {filtered.length === 0 ? (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-16 text-center">
+          <div className="border border-gray-800 rounded-2xl p-16 text-center">
             <div className="text-5xl mb-4">📭</div>
             <p className="text-gray-400 font-medium text-lg">
               {materials.length === 0

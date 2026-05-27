@@ -198,35 +198,35 @@ export default function Browse() {
   const totalSearchResults = searchResults.length + materialResults.length
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen text-[#131b2e]">
       <div className="max-w-6xl mx-auto px-4 py-10">
 
         {/* ── Header ──────────────────────────────────────── */}
-        <h1 className="text-3xl font-black mb-2">Browse Materials</h1>
-        <p className="text-gray-400 mb-8">
+        <h1 className="text-3xl font-black mb-2 text-[#0b1c30]">Browse Materials</h1>
+        <p className="text-[#565e74] mb-8">
           Search for any uploaded material or navigate by department
         </p>
 
         {/* ── Search Bar ──────────────────────────────────── */}
         <div className="relative mb-10">
-          <div className="flex items-center bg-gray-900 border border-gray-700 rounded-2xl px-5 py-4 focus-within:border-teal-500 transition-colors">
+          <div className="academic-card flex items-center rounded-lg px-5 py-4 transition-colors focus-within:border-[#0052ff]/45">
 
             {/* Search icon */}
-            <span className="text-gray-500 text-xl mr-3">🔍</span>
+            <span className="text-[#737688] text-xl mr-3">🔍</span>
 
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search material title, subject, code, or department..."
-              className="flex-1 bg-transparent text-white placeholder-gray-500 text-base focus:outline-none"
+              className="flex-1 bg-transparent text-[#131b2e] placeholder-[#737688] text-base focus:outline-none"
             />
 
             {/* Clear button — only shows when there's a query */}
             {searchQuery && (
               <button
                 onClick={clearSearch}
-                className="text-gray-500 hover:text-white ml-3 text-xl transition-colors"
+                className="text-[#737688] hover:text-[#003ec7] ml-3 text-xl transition-colors"
               >
                 ✕
               </button>
@@ -235,7 +235,7 @@ export default function Browse() {
 
           {/* Search hint */}
           {!searchMode && (
-            <p className="text-gray-600 text-xs mt-2 ml-1">
+            <p className="text-[#737688] text-xs mt-2 ml-1">
               Try a material title, "Data Structures", "CS201", or "ECE"
             </p>
           )}
@@ -247,22 +247,22 @@ export default function Browse() {
             {/* Back to browse button */}
             <button
               onClick={clearSearch}
-              className="text-gray-500 hover:text-white text-sm mb-6 flex items-center gap-2 transition-colors"
+              className="text-[#737688] hover:text-[#003ec7] text-sm mb-6 flex items-center gap-2 transition-colors"
             >
               ← Back to Browse
             </button>
 
             {/* Searching spinner */}
             {searching && (
-              <div className="flex items-center gap-3 text-gray-400 mb-6">
-                <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+              <div className="flex items-center gap-3 text-[#565e74] mb-6">
+                <div className="w-4 h-4 border-2 border-[#0052ff] border-t-transparent rounded-full animate-spin" />
                 Searching uploaded materials and subjects...
               </div>
             )}
 
             {/* Results count */}
             {!searching && (
-              <p className="text-gray-500 text-sm mb-6">
+              <p className="text-[#565e74] text-sm mb-6">
                 {totalSearchResults === 0
                   ? `No results found for "${searchQuery}"`
                   : `${totalSearchResults} result${totalSearchResults !== 1 ? 's' : ''} found for "${searchQuery}"`
@@ -272,15 +272,15 @@ export default function Browse() {
 
             {/* No results state */}
             {!searching && totalSearchResults === 0 && (
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-16 text-center">
+              <div className="academic-card rounded-lg p-16 text-center">
                 <div className="text-5xl mb-4">🔍</div>
-                <p className="text-gray-400 font-medium text-lg">No materials or subjects found</p>
-                <p className="text-gray-600 text-sm mt-2">
+                <p className="text-[#565e74] font-medium text-lg">No materials or subjects found</p>
+                <p className="text-[#737688] text-sm mt-2">
                   Try a different keyword or browse by department below
                 </p>
                 <button
                   onClick={clearSearch}
-                  className="mt-6 bg-teal-500 hover:bg-teal-600 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors"
+                  className="mt-6 bg-[#003ec7] hover:bg-[#0052ff] text-white font-bold px-6 py-2.5 rounded-lg text-sm transition-colors"
                 >
                   Browse by Department
                 </button>
@@ -291,13 +291,13 @@ export default function Browse() {
             {!searching && materialResults.length > 0 && (
               <section className="mb-8">
                 <div className="flex items-center gap-3 mb-3">
-                  <span className="bg-teal-500/10 border border-teal-500/20 text-teal-400 text-xs font-bold px-3 py-1 rounded-full">
+                  <span className="bg-[#e2e7ff] border border-[#c3c5d9] text-[#003ec7] text-xs font-bold px-3 py-1 rounded-full">
                     MATERIALS
                   </span>
-                  <span className="text-gray-400 text-sm">
+                  <span className="text-[#565e74] text-sm">
                     Uploaded files matching your search
                   </span>
-                  <span className="text-gray-600 text-xs">
+                  <span className="text-[#737688] text-xs">
                     {materialResults.length} result{materialResults.length !== 1 ? 's' : ''}
                   </span>
                 </div>
@@ -315,42 +315,42 @@ export default function Browse() {
 
                 {/* Department header */}
                 <div className="flex items-center gap-3 mb-3">
-                  <span className="bg-teal-500/10 border border-teal-500/20 text-teal-400 text-xs font-bold px-3 py-1 rounded-full">
+                  <span className="bg-[#e2e7ff] border border-[#c3c5d9] text-[#003ec7] text-xs font-bold px-3 py-1 rounded-full">
                     {group.code}
                   </span>
-                  <span className="text-gray-400 text-sm">{group.name}</span>
-                  <span className="text-gray-600 text-xs">
+                  <span className="text-[#565e74] text-sm">{group.name}</span>
+                  <span className="text-[#737688] text-xs">
                     {group.subjects.length} result{group.subjects.length !== 1 ? 's' : ''}
                   </span>
                 </div>
 
                 {/* Subjects in this department */}
-                <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                <div className="academic-card rounded-lg overflow-hidden">
                   {group.subjects.map((subject, index) => (
                     <button
                       key={subject.id}
                       onClick={() => navigate(`/subject/${subject.id}`)}
-                      className={`w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-800 transition-colors ${
+                      className={`w-full flex items-center justify-between px-6 py-4 text-left hover:bg-[#f2f3ff] transition-colors ${
                         index !== group.subjects.length - 1
-                          ? 'border-b border-gray-800'
+                          ? 'border-b border-[#c3c5d9]/70'
                           : ''
                       }`}
                     >
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-teal-500/10 rounded-xl flex items-center justify-center text-lg flex-shrink-0">
+                        <div className="w-10 h-10 bg-[#e2e7ff] rounded-lg flex items-center justify-center text-lg flex-shrink-0">
                           📘
                         </div>
                         <div>
                           {/* Highlight matching text in subject name */}
-                          <div className="font-semibold text-white">
+                          <div className="font-semibold text-[#0b1c30]">
                             {highlightMatch(subject.name, searchQuery)}
                           </div>
-                          <div className="text-xs text-gray-500 mt-0.5">
+                          <div className="text-xs text-[#737688] mt-0.5">
                             {subject.code} · Year {subject.year} · Sem {subject.semester}
                           </div>
                         </div>
                       </div>
-                      <span className="text-gray-600 flex-shrink-0">→</span>
+                      <span className="text-[#737688] flex-shrink-0">→</span>
                     </button>
                   ))}
                 </div>
@@ -365,22 +365,22 @@ export default function Browse() {
             <section className="mb-10">
               <div className="mb-4 flex items-end justify-between gap-4">
                 <div>
-                  <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                  <h2 className="text-xs font-bold text-[#737688] uppercase tracking-widest">
                     Latest Uploaded Materials
                   </h2>
-                  <p className="mt-2 text-sm text-gray-500">
+                  <p className="mt-2 text-sm text-[#565e74]">
                     Newest approved files from the StudyVault library
                   </p>
                 </div>
               </div>
 
               {loadingMaterials ? (
-                <div className="flex items-center gap-3 text-gray-400">
-                  <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                <div className="flex items-center gap-3 text-[#565e74]">
+                  <div className="w-4 h-4 border-2 border-[#0052ff] border-t-transparent rounded-full animate-spin" />
                   Loading uploads...
                 </div>
               ) : recentMaterials.length === 0 ? (
-                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center text-gray-500">
+                <div className="academic-card rounded-lg p-8 text-center text-[#565e74]">
                   No uploaded materials yet.
                 </div>
               ) : (
@@ -394,11 +394,11 @@ export default function Browse() {
 
             {/* Step 1 — Department */}
             <section className="mb-10">
-              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
+              <h2 className="text-xs font-bold text-[#737688] uppercase tracking-widest mb-4">
                 Step 1 — Select Department
               </h2>
               {loadingDepts ? (
-                <p className="text-gray-500">Loading departments...</p>
+                <p className="text-[#565e74]">Loading departments...</p>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {departments.map(dept => (
@@ -407,12 +407,12 @@ export default function Browse() {
                       onClick={() => handleDeptSelect(dept)}
                       className={`p-4 rounded-xl border text-left transition-all ${
                         selectedDept?.id === dept.id
-                          ? 'bg-teal-500/20 border-teal-500 text-teal-300'
-                          : 'bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-600'
+                          ? 'bg-[#e2e7ff] border-[#0052ff] text-[#003ec7] shadow-sm'
+                          : 'bg-white/90 border-[#c3c5d9]/80 text-[#434656] hover:bg-[#f2f3ff] hover:border-[#0052ff]/45'
                       }`}
                     >
                       <div className="font-bold text-sm">{dept.code}</div>
-                      <div className="text-xs text-gray-500 mt-1 leading-snug">
+                      <div className="text-xs text-[#737688] mt-1 leading-snug">
                         {dept.name}
                       </div>
                     </button>
@@ -424,7 +424,7 @@ export default function Browse() {
             {/* Step 2 — Year */}
             {selectedDept && (
               <section className="mb-10">
-                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
+                <h2 className="text-xs font-bold text-[#737688] uppercase tracking-widest mb-4">
                   Step 2 — Select Year
                 </h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -434,8 +434,8 @@ export default function Browse() {
                       onClick={() => handleYearSelect(y.value)}
                       className={`p-4 rounded-xl border text-left transition-all ${
                         selectedYear === y.value
-                          ? 'bg-teal-500/20 border-teal-500 text-teal-300'
-                          : 'bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-600'
+                          ? 'bg-[#e2e7ff] border-[#0052ff] text-[#003ec7] shadow-sm'
+                          : 'bg-white/90 border-[#c3c5d9]/80 text-[#434656] hover:bg-[#f2f3ff] hover:border-[#0052ff]/45'
                       }`}
                     >
                       <div className="text-2xl mb-1">{y.icon}</div>
@@ -449,7 +449,7 @@ export default function Browse() {
             {/* Step 3 — Semester */}
             {selectedYear && (
               <section className="mb-10">
-                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
+                <h2 className="text-xs font-bold text-[#737688] uppercase tracking-widest mb-4">
                   Step 3 — Select Semester
                 </h2>
                 <div className="flex gap-3">
@@ -459,8 +459,8 @@ export default function Browse() {
                       onClick={() => setSelectedSem(sem)}
                       className={`px-6 py-3 rounded-xl border font-bold transition-all ${
                         selectedSem === sem
-                          ? 'bg-teal-500/20 border-teal-500 text-teal-300'
-                          : 'bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-600'
+                          ? 'bg-[#e2e7ff] border-[#0052ff] text-[#003ec7] shadow-sm'
+                          : 'bg-white/90 border-[#c3c5d9]/80 text-[#434656] hover:bg-[#f2f3ff] hover:border-[#0052ff]/45'
                       }`}
                     >
                       Semester {sem}
@@ -473,46 +473,46 @@ export default function Browse() {
             {/* Step 4 — Subjects */}
             {selectedSem && (
               <section>
-                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
+                <h2 className="text-xs font-bold text-[#737688] uppercase tracking-widest mb-4">
                   Step 4 — Select Subject
                 </h2>
 
                 {loadingSubjects ? (
-                  <div className="flex items-center gap-3 text-gray-400">
-                    <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="flex items-center gap-3 text-[#565e74]">
+                    <div className="w-4 h-4 border-2 border-[#0052ff] border-t-transparent rounded-full animate-spin" />
                     Loading subjects...
                   </div>
                 ) : subjects.length === 0 ? (
-                  <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center">
+                  <div className="academic-card rounded-lg p-12 text-center">
                     <div className="text-4xl mb-3">📭</div>
-                    <p className="text-gray-400">No subjects found</p>
+                    <p className="text-[#565e74]">No subjects found</p>
                   </div>
                 ) : (
-                  <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                  <div className="academic-card rounded-lg overflow-hidden">
                     {subjects.map((subject, index) => (
                       <button
                         key={subject.id}
                         onClick={() => navigate(`/subject/${subject.id}`)}
-                        className={`w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-800 transition-colors ${
+                        className={`w-full flex items-center justify-between px-6 py-4 text-left hover:bg-[#f2f3ff] transition-colors ${
                           index !== subjects.length - 1
-                            ? 'border-b border-gray-800'
+                            ? 'border-b border-[#c3c5d9]/70'
                             : ''
                         }`}
                       >
                         <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 bg-teal-500/10 rounded-xl flex items-center justify-center text-lg">
+                          <div className="w-10 h-10 bg-[#e2e7ff] rounded-lg flex items-center justify-center text-lg">
                             📘
                           </div>
                           <div>
-                            <div className="font-semibold text-white">
+                            <div className="font-semibold text-[#0b1c30]">
                               {subject.name}
                             </div>
-                            <div className="text-xs text-gray-500 mt-0.5">
+                            <div className="text-xs text-[#737688] mt-0.5">
                               {subject.code} · Sem {subject.semester}
                             </div>
                           </div>
                         </div>
-                        <span className="text-gray-600">→</span>
+                        <span className="text-[#737688]">→</span>
                       </button>
                     ))}
                   </div>
@@ -546,7 +546,7 @@ function highlightMatch(text, query) {
   return (
     <>
       {before}
-      <span className="bg-teal-500/30 text-teal-300 rounded px-0.5">
+      <span className="bg-[#e2e7ff] text-[#003ec7] rounded px-0.5">
         {match}
       </span>
       {after}
