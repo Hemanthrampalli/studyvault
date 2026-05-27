@@ -170,6 +170,7 @@ router.patch('/profile', async (req, res) => {
     .single()
 
   res.json(profile)
+  
 })
 
 module.exports = router
