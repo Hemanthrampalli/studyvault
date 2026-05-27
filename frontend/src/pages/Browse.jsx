@@ -1,10 +1,11 @@
 // Browse.jsx
 // Department → Year → Semester → Subject navigation
-// PLUS a global search bar that searches across all subjects instantly
+// PLUS a global search bar that searches subjects and uploaded materials.
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getDepartments, getSubjects } from '../api'
+import { getDepartments, getMaterials, getSubjects } from '../api'
+import MaterialCard from '../components/MaterialCard'
 
 const YEARS = [
   { value: 1, label: '1st Year', icon: '🌱' },
@@ -29,12 +30,15 @@ export default function Browse() {
   const [selectedSem,  setSelectedSem ] = useState(null)
   const [departments,  setDepartments ] = useState([])
   const [subjects,     setSubjects    ] = useState([])
+  const [recentMaterials, setRecentMaterials] = useState([])
   const [loadingDepts,    setLoadingDepts   ] = useState(true)
   const [loadingSubjects, setLoadingSubjects] = useState(false)
+  const [loadingMaterials, setLoadingMaterials] = useState(true)
 
   // ── Search state ──────────────────────────────────────────
   const [searchQuery,   setSearchQuery  ] = useState('')
   const [searchResults, setSearchResults] = useState([])
+  const [materialResults, setMaterialResults] = useState([])
   const [searching,     setSearching    ] = useState(false)
   const [searchMode,    setSearchMode   ] = useState(false)
   // searchMode = true means user is actively searching
@@ -42,21 +46,28 @@ export default function Browse() {
 
   // Load departments once on mount
   // Read ?search= from URL (coming from Home page search)
-const [searchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
+  const initialSearch = searchParams.get('search') || ''
 
-// Load departments on mount
-useEffect(() => {
-  getDepartments()
-    .then(res => {
-      setDepartments(res.data)
-      // If URL has ?search=something, pre-fill the search box
-      const urlSearch = searchParams.get('search')
-      if (urlSearch) {
-        setSearchQuery(urlSearch)
-      }
-    })
-    .finally(() => setLoadingDepts(false))
-}, [])
+  // Load departments on mount
+  useEffect(() => {
+    getDepartments()
+      .then(res => {
+        setDepartments(res.data)
+        // If URL has ?search=something, pre-fill the search box
+        if (initialSearch) {
+          setSearchQuery(initialSearch)
+        }
+      })
+      .finally(() => setLoadingDepts(false))
+  }, [initialSearch])
+
+  useEffect(() => {
+    getMaterials({ limit: 12 })
+      .then(res => setRecentMaterials(res.data || []))
+      .catch(() => setRecentMaterials([]))
+      .finally(() => setLoadingMaterials(false))
+  }, [])
 
   // Load subjects when dept + year + sem are all selected
   useEffect(() => {
@@ -80,6 +91,7 @@ useEffect(() => {
     if (!query.trim()) {
       setSearchMode(false)
       setSearchResults([])
+      setMaterialResults([])
       return
     }
 
@@ -93,7 +105,7 @@ useEffect(() => {
       // getSubjects without department_id returns all subjects
       // We need to search across all departments
       // So we fetch for each department in parallel using Promise.all
-      const promises = departments.map(dept =>
+      const subjectPromises = departments.map(dept =>
         getSubjects({ department_id: dept.id })
           .then(res => res.data.map(subject => ({
             ...subject,
@@ -104,7 +116,14 @@ useEffect(() => {
           .catch(() => []) // if one dept fails, don't break everything
       )
 
-      const results = await Promise.all(promises)
+      const materialsPromise = getMaterials({ search: query, limit: 50 })
+        .then(res => res.data || [])
+        .catch(() => [])
+
+      const [results, materials] = await Promise.all([
+        Promise.all(subjectPromises),
+        materialsPromise,
+      ])
 
       // Flatten array of arrays into one array
       // [ [subj1, subj2], [subj3] ] → [subj1, subj2, subj3]
@@ -119,9 +138,11 @@ useEffect(() => {
       )
 
       setSearchResults(filtered)
+      setMaterialResults(materials)
     } catch (err) {
       console.log('Search error:', err)
       setSearchResults([])
+      setMaterialResults([])
     } finally {
       setSearching(false)
     }
@@ -157,6 +178,7 @@ useEffect(() => {
     setSearchQuery('')
     setSearchMode(false)
     setSearchResults([])
+    setMaterialResults([])
   }
 
   // Group search results by department for better display
@@ -173,6 +195,8 @@ useEffect(() => {
     return groups
   }, {})
 
+  const totalSearchResults = searchResults.length + materialResults.length
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <div className="max-w-6xl mx-auto px-4 py-10">
@@ -180,7 +204,7 @@ useEffect(() => {
         {/* ── Header ──────────────────────────────────────── */}
         <h1 className="text-3xl font-black mb-2">Browse Materials</h1>
         <p className="text-gray-400 mb-8">
-          Search for any subject or navigate by department
+          Search for any uploaded material or navigate by department
         </p>
 
         {/* ── Search Bar ──────────────────────────────────── */}
@@ -194,7 +218,7 @@ useEffect(() => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search any subject, code, or department..."
+              placeholder="Search material title, subject, code, or department..."
               className="flex-1 bg-transparent text-white placeholder-gray-500 text-base focus:outline-none"
             />
 
@@ -212,7 +236,7 @@ useEffect(() => {
           {/* Search hint */}
           {!searchMode && (
             <p className="text-gray-600 text-xs mt-2 ml-1">
-              Try searching "Data Structures", "CS201", "ECE", or "Machine Learning"
+              Try a material title, "Data Structures", "CS201", or "ECE"
             </p>
           )}
         </div>
@@ -232,25 +256,25 @@ useEffect(() => {
             {searching && (
               <div className="flex items-center gap-3 text-gray-400 mb-6">
                 <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-                Searching across all departments...
+                Searching uploaded materials and subjects...
               </div>
             )}
 
             {/* Results count */}
             {!searching && (
               <p className="text-gray-500 text-sm mb-6">
-                {searchResults.length === 0
-                  ? `No subjects found for "${searchQuery}"`
-                  : `${searchResults.length} subjects found for "${searchQuery}"`
+                {totalSearchResults === 0
+                  ? `No results found for "${searchQuery}"`
+                  : `${totalSearchResults} result${totalSearchResults !== 1 ? 's' : ''} found for "${searchQuery}"`
                 }
               </p>
             )}
 
             {/* No results state */}
-            {!searching && searchResults.length === 0 && (
+            {!searching && totalSearchResults === 0 && (
               <div className="bg-gray-900 border border-gray-800 rounded-2xl p-16 text-center">
                 <div className="text-5xl mb-4">🔍</div>
-                <p className="text-gray-400 font-medium text-lg">No subjects found</p>
+                <p className="text-gray-400 font-medium text-lg">No materials or subjects found</p>
                 <p className="text-gray-600 text-sm mt-2">
                   Try a different keyword or browse by department below
                 </p>
@@ -261,6 +285,28 @@ useEffect(() => {
                   Browse by Department
                 </button>
               </div>
+            )}
+
+            {/* Uploaded material results */}
+            {!searching && materialResults.length > 0 && (
+              <section className="mb-8">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="bg-teal-500/10 border border-teal-500/20 text-teal-400 text-xs font-bold px-3 py-1 rounded-full">
+                    MATERIALS
+                  </span>
+                  <span className="text-gray-400 text-sm">
+                    Uploaded files matching your search
+                  </span>
+                  <span className="text-gray-600 text-xs">
+                    {materialResults.length} result{materialResults.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {materialResults.map(material => (
+                    <MaterialCard key={material.id} material={material} />
+                  ))}
+                </div>
+              </section>
             )}
 
             {/* Grouped results by department */}
@@ -316,6 +362,35 @@ useEffect(() => {
         {/* ── BROWSE MODE ─────────────────────────────────── */}
         {!searchMode && (
           <div>
+            <section className="mb-10">
+              <div className="mb-4 flex items-end justify-between gap-4">
+                <div>
+                  <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                    Latest Uploaded Materials
+                  </h2>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Newest approved files from the StudyVault library
+                  </p>
+                </div>
+              </div>
+
+              {loadingMaterials ? (
+                <div className="flex items-center gap-3 text-gray-400">
+                  <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                  Loading uploads...
+                </div>
+              ) : recentMaterials.length === 0 ? (
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center text-gray-500">
+                  No uploaded materials yet.
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {recentMaterials.map(material => (
+                    <MaterialCard key={material.id} material={material} />
+                  ))}
+                </div>
+              )}
+            </section>
 
             {/* Step 1 — Department */}
             <section className="mb-10">

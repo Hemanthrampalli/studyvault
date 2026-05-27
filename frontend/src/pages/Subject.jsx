@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getMaterials } from '../api'
+import { getMaterials, getSubject } from '../api'
 import { useAuth } from '../context/AuthContext'
 import MaterialCard from '../components/MaterialCard'
 import UploadModal from '../components/UploadModal'
@@ -34,7 +34,7 @@ export default function Subject() {
     setError('')
 
     // Fetch materials for this subject
-    getMaterials(subject_id)
+    getMaterials({ subject_id })
       .then(res => {
         console.log('Materials loaded:', res.data)
         setMaterials(res.data || [])
@@ -46,8 +46,8 @@ export default function Subject() {
       .finally(() => setLoading(false))
 
     // Fetch subject name separately
-    fetch(`${import.meta.env.VITE_API_URL}/api/subjects/${subject_id}`)
-      .then(res => res.json())
+    getSubject(subject_id)
+      .then(res => res.data)
       .then(data => {
         if (data?.name) setSubjectName(data.name)
       })

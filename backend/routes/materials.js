@@ -53,6 +53,13 @@ async function getSubjectIds({ department_id, year, semester }) {
   return data.map((subject) => subject.id)
 }
 
+function normalizeSearchTerm(search) {
+  return String(search || '')
+    .trim()
+    .replace(/[,%]/g, ' ')
+    .replace(/\s+/g, ' ')
+}
+
 router.get('/', async (req, res) => {
   const {
     department_id,
@@ -81,7 +88,16 @@ router.get('/', async (req, res) => {
 
     if (subjectIds) query = query.in('subject_id', subjectIds)
     if (material_type) query = query.eq('material_type', material_type)
-    if (search) query = query.ilike('title', `%${search}%`)
+    const searchTerm = normalizeSearchTerm(search)
+    if (searchTerm) {
+      query = query.or(
+        [
+          `title.ilike.%${searchTerm}%`,
+          `description.ilike.%${searchTerm}%`,
+          `file_path.ilike.%${searchTerm}%`,
+        ].join(','),
+      )
+    }
     if (limit) query = query.limit(Math.min(parseInt(limit, 10) || 20, 50))
 
     const { data, error } = await query

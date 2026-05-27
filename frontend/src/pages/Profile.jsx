@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { getMyUploads, getProfile, updateProfile } from '../api'
 import MaterialCard from '../components/MaterialCard'
 import { useAuth } from '../context/AuthContext'
-import axios from 'axios'
 
 export default function Profile() {
   const { logout, user } = useAuth()

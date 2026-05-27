@@ -37,7 +37,9 @@ export const getSubject = (id) =>
   API.get(`/api/subjects/${id}`)
 
 export const getMaterials = (filters = {}) =>
-  API.get('/api/materials', { params: filters })
+  API.get('/api/materials', {
+    params: typeof filters === 'string' ? { subject_id: filters } : filters,
+  })
 
 export const getMaterial = (id) =>
   API.get(`/api/materials/${id}`)
